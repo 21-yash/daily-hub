@@ -59,6 +59,18 @@ const DailyHub = () => {
   const [city, setCity] = useState('Mumbai');
   const [weatherLoading, setWeatherLoading] = useState(false);
 
+  // Birthday state
+  const [birthdays, setBirthdays] = useState([]);
+  const [showAddBirthday, setShowAddBirthday] = useState(false);
+  const [newBirthday, setNewBirthday] = useState({ name: '', date: '', category: 'family' });
+
+  // Converter state
+  const [converterType, setConverterType] = useState('length');
+  const [fromUnit, setFromUnit] = useState('meter');
+  const [toUnit, setToUnit] = useState('kilometer');
+  const [inputValue, setInputValue] = useState('');
+  const [outputValue, setOutputValue] = useState('');
+
   // Load data from memory on mount
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'light';
@@ -68,6 +80,7 @@ const DailyHub = () => {
     const savedRecovery = localStorage.getItem('recoveryData');
     const savedAutoLock = localStorage.getItem('autoLockTimeout');
     const savedNotes = localStorage.getItem('notes');
+    const savedBirthdays = localStorage.getItem('birthdays');
     
     setTheme(savedTheme);
     if (savedTodos) setTodos(JSON.parse(savedTodos));
@@ -80,6 +93,7 @@ const DailyHub = () => {
     }
     if (savedAutoLock) setAutoLockTimeout(parseInt(savedAutoLock));
     if (savedNotes) setNotes(JSON.parse(savedNotes));
+    if (savedBirthdays) setBirthdays(JSON.parse(savedBirthdays));
   }, []);
 
   // Save data
@@ -102,6 +116,47 @@ const DailyHub = () => {
       localStorage.setItem('notes', JSON.stringify(notes));
     }
   }, [notes]);
+
+  // Save birthdays to localStorage
+  useEffect(() => {
+    if (birthdays.length > 0 || localStorage.getItem('birthdays')) {
+      localStorage.setItem('birthdays', JSON.stringify(birthdays));
+    }
+  }, [birthdays]);
+
+  // Check for birthdays and send notifications
+  useEffect(() => {
+    const checkBirthdays = () => {
+      const today = new Date();
+      const todayStr = `${today.getMonth() + 1}-${today.getDate()}`;
+      
+      birthdays.forEach(birthday => {
+        const birthdayDate = new Date(birthday.date);
+        const birthdayStr = `${birthdayDate.getMonth() + 1}-${birthdayDate.getDate()}`;
+        
+        if (birthdayStr === todayStr) {
+          showToast(`🎉 Today is ${birthday.name}'s birthday!`, 'info');
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('Birthday Reminder', {
+              body: `Today is ${birthday.name}'s birthday! 🎂`,
+              icon: '🎉'
+            });
+          }
+        }
+      });
+    };
+
+    checkBirthdays();
+    const interval = setInterval(checkBirthdays, 3600000); // Check every hour
+    return () => clearInterval(interval);
+  }, [birthdays]);
+
+  // Request notification permission
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
 
   // Auto-lock functionality
   useEffect(() => {
@@ -443,6 +498,154 @@ const DailyHub = () => {
 
   const noteCategories = ['personal', 'work', 'ideas', 'shopping', 'recipes', 'other'];
 
+  // Birthday Functions
+  const addBirthday = () => {
+    if (!newBirthday.name || !newBirthday.date) {
+      showToast('Name and date are required', 'error');
+      return;
+    }
+    
+    const birthday = {
+      id: Date.now(),
+      ...newBirthday,
+      createdAt: new Date().toISOString()
+    };
+    
+    setBirthdays([birthday, ...birthdays]);
+    setNewBirthday({ name: '', date: '', category: 'family' });
+    setShowAddBirthday(false);
+    showToast('Birthday added successfully!');
+  };
+
+  const deleteBirthday = (id) => {
+    setBirthdays(birthdays.filter(b => b.id !== id));
+    showToast('Birthday deleted', 'info');
+  };
+
+  const getUpcomingBirthdays = () => {
+    const today = new Date();
+    return birthdays
+      .map(b => {
+        const bDate = new Date(b.date);
+        const thisYearBirthday = new Date(today.getFullYear(), bDate.getMonth(), bDate.getDate());
+        if (thisYearBirthday < today) {
+          thisYearBirthday.setFullYear(today.getFullYear() + 1);
+        }
+        const daysUntil = Math.ceil((thisYearBirthday - today) / (1000 * 60 * 60 * 24));
+        return { ...b, daysUntil, date: thisYearBirthday };
+      })
+      .sort((a, b) => a.daysUntil - b.daysUntil)
+      .slice(0, 5);
+  };
+
+  // Unit Converter Functions
+  const conversionRates = {
+    length: {
+      meter: 1,
+      kilometer: 0.001,
+      centimeter: 100,
+      millimeter: 1000,
+      mile: 0.000621371,
+      yard: 1.09361,
+      foot: 3.28084,
+      inch: 39.3701
+    },
+    weight: {
+      kilogram: 1,
+      gram: 1000,
+      milligram: 1000000,
+      pound: 2.20462,
+      ounce: 35.274
+    },
+    temperature: {
+      celsius: (v) => v,
+      fahrenheit: (v) => (v * 9/5) + 32,
+      kelvin: (v) => v + 273.15
+    },
+    volume: {
+      liter: 1,
+      milliliter: 1000,
+      gallon: 0.264172,
+      quart: 1.05669,
+      pint: 2.11338,
+      cup: 4.22675,
+      fluid_ounce: 33.814
+    },
+    area: {
+      square_meter: 1,
+      square_kilometer: 0.000001,
+      square_mile: 3.861e-7,
+      square_yard: 1.19599,
+      square_foot: 10.7639,
+      acre: 0.000247105,
+      hectare: 0.0001
+    },
+    speed: {
+      meter_per_second: 1,
+      kilometer_per_hour: 3.6,
+      mile_per_hour: 2.23694,
+      knot: 1.94384
+    }
+  };
+
+  const unitOptions = {
+    length: ['meter', 'kilometer', 'centimeter', 'millimeter', 'mile', 'yard', 'foot', 'inch'],
+    weight: ['kilogram', 'gram', 'milligram', 'pound', 'ounce'],
+    temperature: ['celsius', 'fahrenheit', 'kelvin'],
+    volume: ['liter', 'milliliter', 'gallon', 'quart', 'pint', 'cup', 'fluid_ounce'],
+    area: ['square_meter', 'square_kilometer', 'square_mile', 'square_yard', 'square_foot', 'acre', 'hectare'],
+    speed: ['meter_per_second', 'kilometer_per_hour', 'mile_per_hour', 'knot']
+  };
+
+  const convertUnit = (value, from, to, type) => {
+    if (!value || isNaN(value)) return '';
+    
+    const num = parseFloat(value);
+    
+    if (type === 'temperature') {
+      let celsius;
+      if (from === 'celsius') celsius = num;
+      else if (from === 'fahrenheit') celsius = (num - 32) * 5/9;
+      else celsius = num - 273.15;
+      
+      if (to === 'celsius') return celsius.toFixed(2);
+      else if (to === 'fahrenheit') return ((celsius * 9/5) + 32).toFixed(2);
+      else return (celsius + 273.15).toFixed(2);
+    } else {
+      const rates = conversionRates[type];
+      const baseValue = num / rates[from];
+      return (baseValue * rates[to]).toFixed(6);
+    }
+  };
+
+  const handleConvert = (val) => {
+    setInputValue(val);
+    if (val) {
+      const result = convertUnit(val, fromUnit, toUnit, converterType);
+      setOutputValue(result);
+    } else {
+      setOutputValue('');
+    }
+  };
+
+  const swapUnits = () => {
+    const temp = fromUnit;
+    setFromUnit(toUnit);
+    setToUnit(temp);
+    if (inputValue) {
+      const result = convertUnit(inputValue, toUnit, temp, converterType);
+      setOutputValue(result);
+    }
+  };
+
+  const handleConverterTypeChange = (type) => {
+    setConverterType(type);
+    setFromUnit(unitOptions[type][0]);
+    setToUnit(unitOptions[type][1]);
+    setInputValue('');
+    setOutputValue('');
+  };
+
   const clearAllData = () => {
     const password = prompt('Enter master password to confirm deletion:');
     const saved = localStorage.getItem('masterPassword');
@@ -475,6 +678,7 @@ const DailyHub = () => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'todos', label: 'Tasks', icon: CheckSquare },
+    { id: 'birthdays', label: 'Birthdays', icon: '🎂' },
     { id: 'passwords', label: 'Passwords', icon: Key },
     { id: 'notes', label: 'Notes', icon: StickyNote },
     { id: 'links', label: 'Quick Links', icon: Link2 },
@@ -537,7 +741,7 @@ const DailyHub = () => {
           <aside className={`w-64 ${cardBg} border-r ${borderColor} min-h-screen p-4`}>
             <nav className="space-y-1">
               {navItems.map(item => {
-                const Icon = item.icon;
+                const Icon = typeof item.icon === 'string' ? null : item.icon;
                 const isActive = activeView === item.id;
                 return (
                   <button
@@ -549,7 +753,7 @@ const DailyHub = () => {
                         : theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
                     }`}
                   >
-                    <Icon size={20} />
+                    {Icon ? <Icon size={20} /> : <span className="text-lg">{item.icon}</span>}
                     <span>{item.label}</span>
                   </button>
                 );
@@ -680,15 +884,45 @@ const DailyHub = () => {
 
                 <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105`}>
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className={textSecondary}>Completed</h3>
-                    <CheckSquare className="text-purple-500" size={24} />
+                    <h3 className={textSecondary}>Birthdays</h3>
+                    <span className="text-2xl">🎂</span>
                   </div>
-                  <p className="text-3xl font-bold">{stats.completed}</p>
+                  <p className="text-3xl font-bold">{birthdays.length}</p>
                   <p className={`text-sm ${textSecondary} mt-1`}>
-                    {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}% done
+                    {getUpcomingBirthdays()[0] ? `${getUpcomingBirthdays()[0].daysUntil} days next` : 'None upcoming'}
                   </p>
                 </div>
               </div>
+
+              {/* Upcoming Birthdays Widget */}
+              {birthdays.length > 0 && (
+                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-6`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-semibold flex items-center gap-2">
+                      <span>🎉</span>
+                      Upcoming Birthdays
+                    </h3>
+                    <button
+                      onClick={() => setActiveView('birthdays')}
+                      className="text-sm text-blue-500 hover:underline"
+                    >
+                      View all
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                    {getUpcomingBirthdays().map(birthday => (
+                      <div key={birthday.id} className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-purple-600/20' : 'bg-purple-50'} ${birthday.daysUntil === 0 ? 'ring-2 ring-purple-500' : ''}`}>
+                        <p className="font-semibold">{birthday.name}</p>
+                        <p className={`text-sm ${textSecondary}`}>
+                          {birthday.daysUntil === 0 ? '🎂 Today!' : 
+                           birthday.daysUntil === 1 ? '📅 Tomorrow' : 
+                           `📅 In ${birthday.daysUntil} days`}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Recent Activity */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -804,6 +1038,298 @@ const DailyHub = () => {
             </div>
           )}
 
+          {/* Birthdays View */}
+          {activeView === 'birthdays' && (
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-3xl font-bold flex items-center gap-2">
+                  <span>🎂</span>
+                  Birthday Reminders
+                </h2>
+                <button
+                  onClick={() => setShowAddBirthday(!showAddBirthday)}
+                  className="px-4 py-2 bg-purple-500 text-white rounded-lg transition-all duration-200 hover:bg-purple-600 hover:scale-105 active:scale-95 flex items-center gap-2"
+                >
+                  <Plus size={20} />
+                  {showAddBirthday ? 'Cancel' : 'Add Birthday'}
+                </button>
+              </div>
+
+              {showAddBirthday && (
+                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-6`}>
+                  <h3 className="text-xl font-semibold mb-4">Add New Birthday</h3>
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      placeholder="Name *"
+                      value={newBirthday.name}
+                      onChange={(e) => setNewBirthday({...newBirthday, name: e.target.value})}
+                      className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
+                    />
+                    <input
+                      type="date"
+                      value={newBirthday.date}
+                      onChange={(e) => setNewBirthday({...newBirthday, date: e.target.value})}
+                      className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
+                    />
+                    <select
+                      value={newBirthday.category}
+                      onChange={(e) => setNewBirthday({...newBirthday, category: e.target.value})}
+                      className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
+                    >
+                      <option value="family">Family</option>
+                      <option value="friend">Friend</option>
+                      <option value="colleague">Colleague</option>
+                      <option value="other">Other</option>
+                    </select>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={addBirthday}
+                        className="flex-1 px-4 py-3 bg-purple-500 text-white rounded-lg transition-all duration-200 hover:bg-purple-600 hover:scale-105 active:scale-95"
+                      >
+                        Save Birthday
+                      </button>
+                      <button
+                        onClick={() => setShowAddBirthday(false)}
+                        className="px-4 py-3 bg-gray-500 text-white rounded-lg transition-all duration-200 hover:bg-gray-600 hover:scale-105 active:scale-95"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {getUpcomingBirthdays().map(birthday => (
+                  <div key={birthday.id} className={`${cardBg} p-6 rounded-xl border ${borderColor} transition-all duration-200 hover:shadow-lg hover:scale-105 ${birthday.daysUntil === 0 ? 'ring-2 ring-purple-500' : ''}`}>
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h4 className="text-xl font-semibold">{birthday.name}</h4>
+                        <span className={`inline-block mt-1 px-2 py-1 text-xs rounded ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                          {birthday.category}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => deleteBirthday(birthday.id)}
+                        className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded transition-all duration-200"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                    <div className="text-3xl mb-2">
+                      {birthday.daysUntil === 0 ? '🎉' : 
+                       birthday.daysUntil <= 7 ? '🎂' : '📅'}
+                    </div>
+                    <p className="text-lg font-semibold">
+                      {birthday.daysUntil === 0 ? 'Today!' : 
+                       birthday.daysUntil === 1 ? 'Tomorrow' : 
+                       `In ${birthday.daysUntil} days`}
+                    </p>
+                    <p className={`text-sm ${textSecondary} mt-1`}>
+                      {new Date(birthday.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                    </p>
+                  </div>
+                ))}
+                {birthdays.length === 0 && (
+                  <div className={`${cardBg} p-8 rounded-xl border ${borderColor} text-center ${textSecondary} col-span-full`}>
+                    <span className="text-6xl mb-4 block">🎂</span>
+                    <p>No birthdays added yet. Add your first birthday reminder!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Unit Converter View */}
+          {activeView === 'converter' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6">Unit Converter</h2>
+              
+              <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-6`}>
+                <h3 className="text-xl font-semibold mb-4">Select Conversion Type</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {Object.keys(unitOptions).map(type => (
+                    <button
+                      key={type}
+                      onClick={() => handleConverterTypeChange(type)}
+                      className={`px-4 py-3 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 ${
+                        converterType === type 
+                          ? 'bg-blue-500 text-white shadow-lg' 
+                          : theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'
+                      }`}
+                    >
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className={`${cardBg} p-8 rounded-xl border ${borderColor}`}>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* From Unit */}
+                  <div>
+                    <label className={`block mb-2 font-medium ${textSecondary}`}>From</label>
+                    <select
+                      value={fromUnit}
+                      onChange={(e) => {
+                        setFromUnit(e.target.value);
+                        if (inputValue) {
+                          const result = convertUnit(inputValue, e.target.value, toUnit, converterType);
+                          setOutputValue(result);
+                        }
+                      }}
+                      className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor} mb-3`}
+                    >
+                      {unitOptions[converterType].map(unit => (
+                        <option key={unit} value={unit}>
+                          {unit.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      value={inputValue}
+                      onChange={(e) => handleConvert(e.target.value)}
+                      placeholder="Enter value"
+                      className={`w-full px-4 py-4 rounded-lg ${cardBg} border ${borderColor} text-2xl`}
+                    />
+                  </div>
+
+                  {/* Swap Button */}
+                  <div className="hidden lg:flex items-center justify-center">
+                    <button
+                      onClick={swapUnits}
+                      className={`p-4 rounded-full transition-all duration-200 hover:scale-110 active:scale-95 ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* To Unit */}
+                  <div>
+                    <label className={`block mb-2 font-medium ${textSecondary}`}>To</label>
+                    <select
+                      value={toUnit}
+                      onChange={(e) => {
+                        setToUnit(e.target.value);
+                        if (inputValue) {
+                          const result = convertUnit(inputValue, fromUnit, e.target.value, converterType);
+                          setOutputValue(result);
+                        }
+                      }}
+                      className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor} mb-3`}
+                    >
+                      {unitOptions[converterType].map(unit => (
+                        <option key={unit} value={unit}>
+                          {unit.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </option>
+                      ))}
+                    </select>
+                    <div className={`w-full px-4 py-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'} border ${borderColor} text-2xl font-semibold ${outputValue ? 'text-blue-500' : textSecondary}`}>
+                      {outputValue || '0'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mobile Swap Button */}
+                <div className="lg:hidden mt-4">
+                  <button
+                    onClick={swapUnits}
+                    className={`w-full px-4 py-3 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center gap-2 ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    Swap Units
+                  </button>
+                </div>
+
+                {/* Quick Conversions */}
+                {inputValue && (
+                  <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <h4 className="font-semibold mb-3">Quick Conversions from {inputValue} {fromUnit.replace(/_/g, ' ')}:</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {unitOptions[converterType].filter(unit => unit !== fromUnit).slice(0, 8).map(unit => (
+                        <div key={unit} className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                          <p className={`text-xs ${textSecondary} mb-1`}>
+                            {unit.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </p>
+                          <p className="font-semibold">
+                            {convertUnit(inputValue, fromUnit, unit, converterType)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Common Conversions Reference */}
+              <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mt-6`}>
+                <h3 className="text-xl font-semibold mb-4">Common Conversions Reference</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <h4 className="font-semibold mb-2 text-blue-500">Length</h4>
+                    <ul className={`text-sm ${textSecondary} space-y-1`}>
+                      <li>1 km = 1000 m</li>
+                      <li>1 mile = 1.609 km</li>
+                      <li>1 foot = 30.48 cm</li>
+                      <li>1 inch = 2.54 cm</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-2 text-green-500">Weight</h4>
+                    <ul className={`text-sm ${textSecondary} space-y-1`}>
+                      <li>1 kg = 1000 g</li>
+                      <li>1 kg = 2.205 lb</li>
+                      <li>1 lb = 16 oz</li>
+                      <li>1 ton = 1000 kg</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-2 text-orange-500">Temperature</h4>
+                    <ul className={`text-sm ${textSecondary} space-y-1`}>
+                      <li>0°C = 32°F</li>
+                      <li>100°C = 212°F</li>
+                      <li>0 K = -273.15°C</li>
+                      <li>°F = (°C × 9/5) + 32</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-2 text-purple-500">Volume</h4>
+                    <ul className={`text-sm ${textSecondary} space-y-1`}>
+                      <li>1 L = 1000 mL</li>
+                      <li>1 gallon = 3.785 L</li>
+                      <li>1 cup = 236.6 mL</li>
+                      <li>1 fl oz = 29.57 mL</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-2 text-pink-500">Area</h4>
+                    <ul className={`text-sm ${textSecondary} space-y-1`}>
+                      <li>1 km² = 100 hectares</li>
+                      <li>1 acre = 4047 m²</li>
+                      <li>1 hectare = 10000 m²</li>
+                      <li>1 m² = 10.76 ft²</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-2 text-cyan-500">Speed</h4>
+                    <ul className={`text-sm ${textSecondary} space-y-1`}>
+                      <li>1 m/s = 3.6 km/h</li>
+                      <li>1 mph = 1.609 km/h</li>
+                      <li>1 knot = 1.852 km/h</li>
+                      <li>1 km/h = 0.621 mph</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
           {/* Tasks View */}
           {activeView === 'todos' && (
             <div>
@@ -1409,14 +1935,6 @@ const DailyHub = () => {
             <div className={`${cardBg} p-8 rounded-xl border ${borderColor} text-center`}>
               <Calculator size={48} className="mx-auto mb-4 text-orange-500" />
               <h2 className="text-2xl font-bold mb-2">Calculator</h2>
-              <p className={textSecondary}>Coming soon!</p>
-            </div>
-          )}
-
-          {activeView === 'converter' && (
-            <div className={`${cardBg} p-8 rounded-xl border ${borderColor} text-center`}>
-              <Gauge size={48} className="mx-auto mb-4 text-cyan-500" />
-              <h2 className="text-2xl font-bold mb-2">Unit Converter</h2>
               <p className={textSecondary}>Coming soon!</p>
             </div>
           )}
