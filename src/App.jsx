@@ -68,6 +68,9 @@ const DailyHub = () => {
   const [searchNote, setSearchNote] = useState('');
   const [noteCategoryFilter, setNoteCategoryFilter] = useState('all');
 
+  // Links state
+  const [links, setLinks] = useState([]);
+
   // Dashboard state
   const [currentTime, setCurrentTime] = useState(new Date());
   const [weather, setWeather] = useState(null);
@@ -97,6 +100,7 @@ const DailyHub = () => {
           if (userData.passwords) setPasswords(userData.passwords);
           if (userData.notes) setNotes(userData.notes);
           if (userData.birthdays) setBirthdays(userData.birthdays);
+          if (userData.links) setLinks(userData.links);
           if (userData.watchlist) {
             // Sync watchlist to localStorage for the Watchlist component
             localStorage.setItem('watchlist', JSON.stringify(userData.watchlist));
@@ -115,6 +119,7 @@ const DailyHub = () => {
         const savedAutoLock = localStorage.getItem('autoLockTimeout');
         const savedNotes = localStorage.getItem('notes');
         const savedBirthdays = localStorage.getItem('birthdays');
+        const savedLinks = localStorage.getItem('links');
         
         setTheme(savedTheme);
         if (savedTodos) setTodos(JSON.parse(savedTodos));
@@ -128,6 +133,7 @@ const DailyHub = () => {
         if (savedAutoLock) setAutoLockTimeout(parseInt(savedAutoLock));
         if (savedNotes) setNotes(JSON.parse(savedNotes));
         if (savedBirthdays) setBirthdays(JSON.parse(savedBirthdays));
+        if (savedLinks) setLinks(JSON.parse(savedLinks));
       }
     };
     checkAuth();
@@ -174,6 +180,7 @@ const DailyHub = () => {
         passwords,
         notes,
         birthdays,
+        links,
         watchlist: watchlistData ? JSON.parse(watchlistData) : [],
         theme
       });
@@ -186,8 +193,40 @@ const DailyHub = () => {
   useEffect(() => {
     if (birthdays.length > 0 || localStorage.getItem('birthdays')) {
       localStorage.setItem('birthdays', JSON.stringify(birthdays));
+      if (isAuthenticated) {
+        syncToServer();
+      }
     }
   }, [birthdays]);
+
+  // Save links to localStorage
+  useEffect(() => {
+    if (links.length > 0 || localStorage.getItem('links')) {
+      localStorage.setItem('links', JSON.stringify(links));
+      if (isAuthenticated) {
+        syncToServer();
+      }
+    }
+  }, [links]);
+
+  // Sync watchlist changes to server
+  useEffect(() => {
+    if (isAuthenticated) {
+      const syncWatchlist = () => {
+        syncToServer();
+      };
+      
+      // Check for watchlist changes every 2 seconds
+      const interval = setInterval(() => {
+        const currentWatchlist = localStorage.getItem('watchlist');
+        if (currentWatchlist) {
+          syncToServer();
+        }
+      }, 2000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
 
   // Check for birthdays and send notifications
   useEffect(() => {
@@ -701,12 +740,17 @@ const DailyHub = () => {
     // Load user data from server
     try {
       const data = await authService.getData();
-      if (data.todos) setTodos(data.todos);
-      if (data.passwords) setPasswords(data.passwords);
-      if (data.notes) setNotes(data.notes);
-      if (data.birthdays) setBirthdays(data.birthdays);
-      if (data.watchlist) {
+      setTodos(data.todos || []);
+      setPasswords(data.passwords || []);
+      setNotes(data.notes || []);
+      setBirthdays(data.birthdays || []);
+      setLinks(data.links || []);
+      if (data.watchlist && data.watchlist.length > 0) {
         localStorage.setItem('watchlist', JSON.stringify(data.watchlist));
+        // Force watchlist component to reload
+        window.dispatchEvent(new Event('storage'));
+      } else {
+        localStorage.removeItem('watchlist');
       }
       if (data.theme) setTheme(data.theme);
       showToast('Login successful!');
@@ -719,6 +763,20 @@ const DailyHub = () => {
     authService.logout();
     setIsAuthenticated(false);
     setCurrentUser(null);
+    
+    // Clear all data on logout
+    setTodos([]);
+    setPasswords([]);
+    setNotes([]);
+    setBirthdays([]);
+    setLinks([]);
+    localStorage.removeItem('watchlist');
+    localStorage.removeItem('todos');
+    localStorage.removeItem('passwords');
+    localStorage.removeItem('notes');
+    localStorage.removeItem('birthdays');
+    localStorage.removeItem('links');
+    
     showToast('Logged out successfully', 'info');
   };
 
@@ -2282,7 +2340,7 @@ const DailyHub = () => {
           {activeView === 'watchlist' && <Watchlist theme={theme} />}
 
           {/* Quick Links View */}
-          {activeView === 'links' && <QuickLinks theme={theme} />}
+          {activeView === 'links' && <QuickLinks theme={theme} links={links} setLinks={setLinks} />}
 
           {/* Calculator View */}
           {activeView === 'calculator' && <Calculator theme={theme} />}

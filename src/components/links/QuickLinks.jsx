@@ -1,24 +1,28 @@
-
 import React, { useState } from 'react';
 import { ExternalLink, Plus, Trash2, Edit2, Star } from 'lucide-react';
 
-const QuickLinks = ({ theme }) => {
-  const [links, setLinks] = useState([
-    { id: 1, title: 'Google', url: 'https://www.google.com', category: 'Search', favorite: true },
-    { id: 2, title: 'GitHub', url: 'https://github.com', category: 'Development', favorite: true },
-    { id: 3, title: 'Stack Overflow', url: 'https://stackoverflow.com', category: 'Development', favorite: false },
-    { id: 4, title: 'YouTube', url: 'https://www.youtube.com', category: 'Social', favorite: true },
-    { id: 5, title: 'Gmail', url: 'https://mail.google.com', category: 'Productivity', favorite: true },
-    { id: 6, title: 'LinkedIn', url: 'https://www.linkedin.com', category: 'Social', favorite: false },
-    { id: 7, title: 'Twitter', url: 'https://twitter.com', category: 'Social', favorite: false },
-    { id: 8, title: 'Replit', url: 'https://replit.com', category: 'Development', favorite: true },
-    { id: 9, title: 'MDN Web Docs', url: 'https://developer.mozilla.org', category: 'Development', favorite: false },
-    { id: 10, title: 'ChatGPT', url: 'https://chat.openai.com', category: 'AI', favorite: true },
-    { id: 11, title: 'Netflix', url: 'https://www.netflix.com', category: 'Entertainment', favorite: false },
-    { id: 12, title: 'Amazon', url: 'https://www.amazon.in', category: 'Shopping', favorite: false },
-    { id: 13, title: 'Flipkart', url: 'https://www.flipkart.com', category: 'Shopping', favorite: false },
-    { id: 14, title: 'WhatsApp Web', url: 'https://web.whatsapp.com', category: 'Social', favorite: true },
-  ]);
+const QuickLinks = ({ theme, links, setLinks }) => {
+  // Initialize with default links if empty
+  React.useEffect(() => {
+    if (links.length === 0) {
+      setLinks([
+        { id: 1, title: 'Google', url: 'https://www.google.com', category: 'Search', favorite: true },
+        { id: 2, title: 'GitHub', url: 'https://github.com', category: 'Development', favorite: true },
+        { id: 3, title: 'Stack Overflow', url: 'https://stackoverflow.com', category: 'Development', favorite: false },
+        { id: 4, title: 'YouTube', url: 'https://www.youtube.com', category: 'Social', favorite: true },
+        { id: 5, title: 'Gmail', url: 'https://mail.google.com', category: 'Productivity', favorite: true },
+        { id: 6, title: 'LinkedIn', url: 'https://www.linkedin.com', category: 'Social', favorite: false },
+        { id: 7, title: 'Twitter', url: 'https://twitter.com', category: 'Social', favorite: false },
+        { id: 8, title: 'Replit', url: 'https://replit.com', category: 'Development', favorite: true },
+        { id: 9, title: 'MDN Web Docs', url: 'https://developer.mozilla.org', category: 'Development', favorite: false },
+        { id: 10, title: 'ChatGPT', url: 'https://chat.openai.com', category: 'AI', favorite: true },
+        { id: 11, title: 'Netflix', url: 'https://www.netflix.com', category: 'Entertainment', favorite: false },
+        { id: 12, title: 'Amazon', url: 'https://www.amazon.in', category: 'Shopping', favorite: false },
+        { id: 13, title: 'Flipkart', url: 'https://www.flipkart.com', category: 'Shopping', favorite: false },
+        { id: 14, title: 'WhatsApp Web', url: 'https://web.whatsapp.com', category: 'Social', favorite: true },
+      ]);
+    }
+  }, []);
   
   const [showAddLink, setShowAddLink] = useState(false);
   const [newLink, setNewLink] = useState({ title: '', url: '', category: 'General' });
