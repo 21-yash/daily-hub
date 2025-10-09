@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, CheckSquare, Key, StickyNote, Link2, Calculator, Gauge, Moon, Sun, Menu, X, Search, Home, Settings, Download, Upload, Trash2, Eye, EyeOff, Copy, Lock } from 'lucide-react';
+import { Plus, CheckSquare, Key, StickyNote, Link2, Calculator as CalculatorIcon, Gauge, Moon, Sun, Menu, X, Search, Home, Settings, Download, Upload, Trash2, Eye, EyeOff, Copy, Lock, Bot, Clapperboard, Gamepad2, Cake, LogIn, LogOut, User  } from 'lucide-react';
+import QuickLinks from './components/links/QuickLinks';
+import Calculator from './components/calculator/Calculator';
+import Watchlist from './components/watchlist/Watchlist';
+import { getSpecialDaysForDate, getUpcomingHolidays } from './utils/indianHolidays';
+import AiChat from './components/aichat/AiChat';
+import AuthModal from './components/auth/AuthModal';
+import { authService } from './services/authService';
+import { getOnThisDay } from './utils/onThisDay';
 
 const DailyHub = () => {
   const [theme, setTheme] = useState('light');
   const [activeView, setActiveView] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   
   // Todo state
   const [todos, setTodos] = useState([]);
@@ -73,49 +84,99 @@ const DailyHub = () => {
 
   // Load data from memory on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    const savedTodos = localStorage.getItem('todos');
-    const savedMasterPassword = localStorage.getItem('masterPassword');
-    const savedPasswords = localStorage.getItem('passwords');
-    const savedRecovery = localStorage.getItem('recoveryData');
-    const savedAutoLock = localStorage.getItem('autoLockTimeout');
-    const savedNotes = localStorage.getItem('notes');
-    const savedBirthdays = localStorage.getItem('birthdays');
-    
-    setTheme(savedTheme);
-    if (savedTodos) setTodos(JSON.parse(savedTodos));
-    if (savedMasterPassword) setMasterPasswordSet(true);
-    if (savedPasswords) setPasswords(JSON.parse(savedPasswords));
-    if (savedRecovery) {
-      const recovery = JSON.parse(savedRecovery);
-      setRecoveryQuestion(recovery.question);
-      setRecoveryAnswer(recovery.answer);
-    }
-    if (savedAutoLock) setAutoLockTimeout(parseInt(savedAutoLock));
-    if (savedNotes) setNotes(JSON.parse(savedNotes));
-    if (savedBirthdays) setBirthdays(JSON.parse(savedBirthdays));
+    const checkAuth = async () => {
+      if (authService.isAuthenticated()) {
+        setIsAuthenticated(true);
+        try {
+          const userData = await authService.getData();
+          if (userData.todos) setTodos(userData.todos);
+          if (userData.passwords) setPasswords(userData.passwords);
+          if (userData.notes) setNotes(userData.notes);
+          if (userData.birthdays) setBirthdays(userData.birthdays);
+          if (userData.watchlist) {
+            // Sync watchlist to localStorage for the Watchlist component
+            localStorage.setItem('watchlist', JSON.stringify(userData.watchlist));
+          }
+          if (userData.theme) setTheme(userData.theme);
+        } catch (error) {
+          console.error('Failed to load user data:', error);
+        }
+      } else {
+        // Load from localStorage if not authenticated
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        const savedTodos = localStorage.getItem('todos');
+        const savedMasterPassword = localStorage.getItem('masterPassword');
+        const savedPasswords = localStorage.getItem('passwords');
+        const savedRecovery = localStorage.getItem('recoveryData');
+        const savedAutoLock = localStorage.getItem('autoLockTimeout');
+        const savedNotes = localStorage.getItem('notes');
+        const savedBirthdays = localStorage.getItem('birthdays');
+        
+        setTheme(savedTheme);
+        if (savedTodos) setTodos(JSON.parse(savedTodos));
+        if (savedMasterPassword) setMasterPasswordSet(true);
+        if (savedPasswords) setPasswords(JSON.parse(savedPasswords));
+        if (savedRecovery) {
+          const recovery = JSON.parse(savedRecovery);
+          setRecoveryQuestion(recovery.question);
+          setRecoveryAnswer(recovery.answer);
+        }
+        if (savedAutoLock) setAutoLockTimeout(parseInt(savedAutoLock));
+        if (savedNotes) setNotes(JSON.parse(savedNotes));
+        if (savedBirthdays) setBirthdays(JSON.parse(savedBirthdays));
+      }
+    };
+    checkAuth();
   }, []);
 
   // Save data
   useEffect(() => {
     localStorage.setItem('todos', JSON.stringify(todos));
+    if (isAuthenticated) {
+      syncToServer();
+    }
   }, [todos]);
 
   useEffect(() => {
     localStorage.setItem('theme', theme);
+    if (isAuthenticated) {
+      syncToServer();
+    }
   }, [theme]);
 
   useEffect(() => {
     if (passwords.length > 0 || localStorage.getItem('passwords')) {
       localStorage.setItem('passwords', JSON.stringify(passwords));
+      if (isAuthenticated) {
+        syncToServer();
+      }
     }
   }, [passwords]);
 
   useEffect(() => {
     if (notes.length > 0 || localStorage.getItem('notes')) {
       localStorage.setItem('notes', JSON.stringify(notes));
+      if (isAuthenticated) {
+        syncToServer();
+      }
     }
   }, [notes]);
+
+  const syncToServer = async () => {
+    try {
+      const watchlistData = localStorage.getItem('watchlist');
+      await authService.syncData({
+        todos,
+        passwords,
+        notes,
+        birthdays,
+        watchlist: watchlistData ? JSON.parse(watchlistData) : [],
+        theme
+      });
+    } catch (error) {
+      console.error('Failed to sync data:', error);
+    }
+  };
 
   // Save birthdays to localStorage
   useEffect(() => {
@@ -628,6 +689,35 @@ const DailyHub = () => {
     }
   };
 
+  const handleAuthSuccess = async (userData) => {
+    setIsAuthenticated(true);
+    setCurrentUser(userData);
+    setShowAuthModal(false);
+    
+    // Load user data from server
+    try {
+      const data = await authService.getData();
+      if (data.todos) setTodos(data.todos);
+      if (data.passwords) setPasswords(data.passwords);
+      if (data.notes) setNotes(data.notes);
+      if (data.birthdays) setBirthdays(data.birthdays);
+      if (data.watchlist) {
+        localStorage.setItem('watchlist', JSON.stringify(data.watchlist));
+      }
+      if (data.theme) setTheme(data.theme);
+      showToast('Login successful!');
+    } catch (error) {
+      console.error('Failed to load user data:', error);
+    }
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    showToast('Logged out successfully', 'info');
+  };
+
   const swapUnits = () => {
     const temp = fromUnit;
     setFromUnit(toUnit);
@@ -644,6 +734,102 @@ const DailyHub = () => {
     setToUnit(unitOptions[type][1]);
     setInputValue('');
     setOutputValue('');
+  };
+
+  // Memory Match Game Functions
+  const initMemoryGame = () => {
+    const emojis = ['🎮', '🎯', '🎲', '🎪', '🎨', '🎭', '🎸', '🎹'];
+    const cards = [...emojis, ...emojis]
+      .sort(() => Math.random() - 0.5)
+      .map((emoji, index) => ({ id: index, emoji, flipped: false }));
+    setMemoryCards(cards);
+    setFlippedCards([]);
+    setMatchedCards([]);
+    setMemoryMoves(0);
+    setGameWon(false);
+  };
+
+  const handleCardClick = (cardId) => {
+    if (flippedCards.length === 2 || flippedCards.includes(cardId) || matchedCards.includes(cardId)) return;
+    
+    const newFlipped = [...flippedCards, cardId];
+    setFlippedCards(newFlipped);
+
+    if (newFlipped.length === 2) {
+      setMemoryMoves(memoryMoves + 1);
+      const card1 = memoryCards.find(c => c.id === newFlipped[0]);
+      const card2 = memoryCards.find(c => c.id === newFlipped[1]);
+      
+      if (card1.emoji === card2.emoji) {
+        setMatchedCards([...matchedCards, ...newFlipped]);
+        setFlippedCards([]);
+        if (matchedCards.length + 2 === memoryCards.length) {
+          setGameWon(true);
+          showToast('🎉 You won! Great memory!');
+        }
+      } else {
+        setTimeout(() => setFlippedCards([]), 1000);
+      }
+    }
+  };
+
+  // Number Guessing Game Functions
+  const initGuessingGame = () => {
+    setTargetNumber(Math.floor(Math.random() * 100) + 1);
+    setGuessNumber('');
+    setGuessAttempts(0);
+    setGuessHistory([]);
+    setGameWon(false);
+  };
+
+  const handleGuess = () => {
+    const guess = parseInt(guessNumber);
+    if (isNaN(guess) || guess < 1 || guess > 100) {
+      showToast('Please enter a number between 1 and 100', 'error');
+      return;
+    }
+
+    const newAttempts = guessAttempts + 1;
+    setGuessAttempts(newAttempts);
+    
+    let hint = '';
+    if (guess === targetNumber) {
+      setGameWon(true);
+      hint = `🎉 Correct! You won in ${newAttempts} attempts!`;
+      showToast(hint);
+    } else if (guess < targetNumber) {
+      hint = '📈 Too low! Try higher';
+    } else {
+      hint = '📉 Too high! Try lower';
+    }
+    
+    setGuessHistory([{ guess, hint }, ...guessHistory]);
+    setGuessNumber('');
+  };
+
+  // Reaction Time Game Functions
+  const startReactionTest = () => {
+    setReactionWaiting(true);
+    const delay = Math.random() * 3000 + 2000;
+    setTimeout(() => {
+      setReactionStartTime(Date.now());
+      setReactionWaiting(false);
+    }, delay);
+  };
+
+  const handleReactionClick = () => {
+    if (reactionWaiting) {
+      showToast('Too early! Wait for green.', 'error');
+      setReactionWaiting(false);
+      return;
+    }
+    
+    if (reactionStartTime) {
+      const reactionTime = Date.now() - reactionStartTime;
+      setReactionTimes([reactionTime, ...reactionTimes.slice(0, 4)]);
+      showToast(`${reactionTime}ms - Great reaction!`);
+      setReactionStartTime(null);
+    }
   };
 
   const clearAllData = () => {
@@ -675,14 +861,32 @@ const DailyHub = () => {
     completed: todos.filter(t => t.completed).length
   };
 
+  // Games state
+  const [activeGame, setActiveGame] = useState(null);
+  const [memoryCards, setMemoryCards] = useState([]);
+  const [flippedCards, setFlippedCards] = useState([]);
+  const [matchedCards, setMatchedCards] = useState([]);
+  const [memoryMoves, setMemoryMoves] = useState(0);
+  const [guessNumber, setGuessNumber] = useState('');
+  const [targetNumber, setTargetNumber] = useState(Math.floor(Math.random() * 100) + 1);
+  const [guessAttempts, setGuessAttempts] = useState(0);
+  const [guessHistory, setGuessHistory] = useState([]);
+  const [reactionStartTime, setReactionStartTime] = useState(null);
+  const [reactionWaiting, setReactionWaiting] = useState(false);
+  const [reactionTimes, setReactionTimes] = useState([]);
+  const [gameWon, setGameWon] = useState(false);
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'todos', label: 'Tasks', icon: CheckSquare },
-    { id: 'birthdays', label: 'Birthdays', icon: '🎂' },
+    { id: 'aichat', label: 'Chat with AI', icon: Bot },
+    { id: 'birthdays', label: 'Birthdays', icon: Cake },
     { id: 'passwords', label: 'Passwords', icon: Key },
     { id: 'notes', label: 'Notes', icon: StickyNote },
+    { id: 'watchlist', label: 'Watchlist', icon: Clapperboard },
+    { id: 'games', label: 'Games', icon: Gamepad2 },
     { id: 'links', label: 'Quick Links', icon: Link2 },
-    { id: 'calculator', label: 'Calculator', icon: Calculator },
+    { id: 'calculator', label: 'Calculator', icon: CalculatorIcon },
     { id: 'converter', label: 'Unit Converter', icon: Gauge },
   ];
 
@@ -694,6 +898,15 @@ const DailyHub = () => {
 
   return (
     <div className={`min-h-screen ${bgColor} ${textColor} transition-colors duration-200`}>
+      {/* Auth Modal */}
+      {showAuthModal && (
+        <AuthModal 
+          theme={theme} 
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={handleAuthSuccess}
+        />
+      )}
+
       {/* Toast Notifications */}
       <div className="fixed top-20 right-4 z-50 space-y-2">
         {toasts.map(toast => (
@@ -725,6 +938,23 @@ const DailyHub = () => {
           </div>
           
           <div className="flex items-center gap-2">
+            {isAuthenticated ? (
+              <button 
+                onClick={handleLogout}
+                className={`p-2 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} flex items-center gap-2`}
+              >
+                <LogOut size={20} />
+                <span className="hidden md:inline">Logout</span>
+              </button>
+            ) : (
+              <button 
+                onClick={() => setShowAuthModal(true)}
+                className={`p-2 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} flex items-center gap-2`}
+              >
+                <LogIn size={20} />
+                <span className="hidden md:inline">Login</span>
+              </button>
+            )}
             <button 
               onClick={toggleTheme}
               className={`p-2 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
@@ -796,13 +1026,19 @@ const DailyHub = () => {
                   <div className="text-6xl font-bold tracking-tight mb-1">
                     {formatTime()}
                   </div>
-                  <div className="flex gap-2 mt-4">
+                  <div className="flex gap-2 mt-4 flex-wrap">
                     <div className={`px-3 py-1 rounded-lg ${theme === 'dark' ? 'bg-blue-600/20 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
                       Week {Math.ceil((currentTime.getDate() + new Date(currentTime.getFullYear(), currentTime.getMonth(), 1).getDay()) / 7)}
                     </div>
                     <div className={`px-3 py-1 rounded-lg ${theme === 'dark' ? 'bg-purple-600/20 text-purple-400' : 'bg-purple-100 text-purple-600'}`}>
                       Day {Math.floor((currentTime - new Date(currentTime.getFullYear(), 0, 0)) / 86400000)}
                     </div>
+                    {getSpecialDaysForDate(currentTime).map((holiday, idx) => (
+                      <div key={idx} className={`px-3 py-1 rounded-lg ${theme === 'dark' ? 'bg-pink-600/20 text-pink-400' : 'bg-pink-100 text-pink-600'} flex items-center gap-1`}>
+                        <span>{holiday.emoji}</span>
+                        <span>{holiday.name}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -924,6 +1160,48 @@ const DailyHub = () => {
                 </div>
               )}
 
+              {/* On This Day Widget */}
+              {getOnThisDay().length > 0 && (
+                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-6`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-semibold flex items-center gap-2">
+                      <span>📅</span>
+                      On This Day
+                    </h3>
+                  </div>
+                  <div className="space-y-2">
+                    {getOnThisDay().map((event, idx) => (
+                      <div key={idx} className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-indigo-600/20' : 'bg-indigo-50'}`}>
+                        <p className="font-medium">{event.event}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Upcoming Holidays Widget */}
+              <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-6`}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold flex items-center gap-2">
+                    <span>🎊</span>
+                    Upcoming Holidays
+                  </h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                  {getUpcomingHolidays().map((holiday, idx) => (
+                    <div key={idx} className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-orange-600/20' : 'bg-orange-50'} ${holiday.daysUntil === 0 ? 'ring-2 ring-orange-500' : ''}`}>
+                      <div className="text-2xl mb-1">{holiday.emoji}</div>
+                      <p className="font-semibold text-sm">{holiday.name}</p>
+                      <p className={`text-xs ${textSecondary}`}>
+                        {holiday.daysUntil === 0 ? 'Today!' : 
+                         holiday.daysUntil === 1 ? 'Tomorrow' : 
+                         `In ${holiday.daysUntil} days`}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Recent Activity */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Recent Tasks */}
@@ -1030,7 +1308,7 @@ const DailyHub = () => {
                     onClick={() => setActiveView('calculator')}
                     className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-purple-600/20 hover:bg-purple-600/30' : 'bg-purple-50 hover:bg-purple-100'} transition-all duration-200 hover:scale-105 active:scale-95`}
                   >
-                    <Calculator className="mx-auto mb-2 text-purple-500" size={24} />
+                    <CalculatorIcon className="mx-auto mb-2 text-purple-500" size={24} />
                     <p className="text-sm font-medium">Calculator</p>
                   </button>
                 </div>
@@ -1922,22 +2200,235 @@ const DailyHub = () => {
             </div>
           )}
 
-          {/* Placeholder views */}
-          {activeView === 'links' && (
-            <div className={`${cardBg} p-8 rounded-xl border ${borderColor} text-center`}>
-              <Link2 size={48} className="mx-auto mb-4 text-purple-500" />
-              <h2 className="text-2xl font-bold mb-2">Quick Links</h2>
-              <p className={textSecondary}>Coming soon!</p>
+          {/* Games View */}
+          {activeView === 'games' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 flex items-center gap-2">
+                <span>🎮</span>
+                Mini Games
+              </h2>
+
+              {!activeGame ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Memory Match Card */}
+                  <div 
+                    onClick={() => {
+                      setActiveGame('memory');
+                      initMemoryGame();
+                    }}
+                    className={`${cardBg} p-8 rounded-xl border ${borderColor} text-center cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-lg`}
+                  >
+                    <div className="text-6xl mb-4">🧠</div>
+                    <h3 className="text-xl font-bold mb-2">Memory Match</h3>
+                    <p className={textSecondary}>Match all the pairs of emojis</p>
+                  </div>
+
+                  {/* Number Guessing Card */}
+                  <div 
+                    onClick={() => {
+                      setActiveGame('guess');
+                      initGuessingGame();
+                    }}
+                    className={`${cardBg} p-8 rounded-xl border ${borderColor} text-center cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-lg`}
+                  >
+                    <div className="text-6xl mb-4">🔢</div>
+                    <h3 className="text-xl font-bold mb-2">Number Guessing</h3>
+                    <p className={textSecondary}>Guess the number between 1-100</p>
+                  </div>
+
+                  {/* Reaction Time Card */}
+                  <div 
+                    onClick={() => setActiveGame('reaction')}
+                    className={`${cardBg} p-8 rounded-xl border ${borderColor} text-center cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-lg`}
+                  >
+                    <div className="text-6xl mb-4">⚡</div>
+                    <h3 className="text-xl font-bold mb-2">Reaction Time</h3>
+                    <p className={textSecondary}>Test your reaction speed</p>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <button
+                    onClick={() => setActiveGame(null)}
+                    className="mb-6 px-4 py-2 bg-gray-500 text-white rounded-lg transition-all duration-200 hover:bg-gray-600 hover:scale-105 active:scale-95"
+                  >
+                    ← Back to Games
+                  </button>
+
+                  {/* Memory Match Game */}
+                  {activeGame === 'memory' && (
+                    <div className={`${cardBg} p-6 rounded-xl border ${borderColor}`}>
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-2xl font-bold">Memory Match 🧠</h3>
+                        <div className="flex items-center gap-4">
+                          <span className={textSecondary}>Moves: {memoryMoves}</span>
+                          <button
+                            onClick={initMemoryGame}
+                            className="px-4 py-2 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95"
+                          >
+                            New Game
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-4 gap-3 max-w-md mx-auto">
+                        {memoryCards.map(card => (
+                          <button
+                            key={card.id}
+                            onClick={() => handleCardClick(card.id)}
+                            disabled={matchedCards.includes(card.id)}
+                            className={`aspect-square text-4xl rounded-xl transition-all duration-300 ${
+                              flippedCards.includes(card.id) || matchedCards.includes(card.id)
+                                ? theme === 'dark' ? 'bg-blue-600' : 'bg-blue-400'
+                                : theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-300 hover:bg-gray-400'
+                            } ${matchedCards.includes(card.id) ? 'opacity-50' : ''}`}
+                          >
+                            {(flippedCards.includes(card.id) || matchedCards.includes(card.id)) ? card.emoji : '?'}
+                          </button>
+                        ))}
+                      </div>
+
+                      {gameWon && (
+                        <div className="mt-6 p-4 bg-green-500 text-white rounded-lg text-center">
+                          <p className="text-xl font-bold">🎉 You Won!</p>
+                          <p>Completed in {memoryMoves} moves</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Number Guessing Game */}
+                  {activeGame === 'guess' && (
+                    <div className={`${cardBg} p-6 rounded-xl border ${borderColor}`}>
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-2xl font-bold">Number Guessing 🔢</h3>
+                        <div className="flex items-center gap-4">
+                          <span className={textSecondary}>Attempts: {guessAttempts}</span>
+                          <button
+                            onClick={initGuessingGame}
+                            className="px-4 py-2 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95"
+                          >
+                            New Game
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="max-w-md mx-auto">
+                        <p className={`text-center mb-4 ${textSecondary}`}>
+                          Guess a number between 1 and 100
+                        </p>
+                        
+                        {!gameWon && (
+                          <div className="flex gap-2 mb-6">
+                            <input
+                              type="number"
+                              value={guessNumber}
+                              onChange={(e) => setGuessNumber(e.target.value)}
+                              onKeyPress={(e) => e.key === 'Enter' && handleGuess()}
+                              placeholder="Enter your guess"
+                              min="1"
+                              max="100"
+                              className={`flex-1 px-4 py-3 rounded-lg ${cardBg} border ${borderColor} text-center text-2xl`}
+                            />
+                            <button
+                              onClick={handleGuess}
+                              className="px-6 py-3 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95"
+                            >
+                              Guess
+                            </button>
+                          </div>
+                        )}
+
+                        {gameWon && (
+                          <div className="mb-6 p-4 bg-green-500 text-white rounded-lg text-center">
+                            <p className="text-xl font-bold">🎉 Correct!</p>
+                            <p>You found {targetNumber} in {guessAttempts} attempts</p>
+                          </div>
+                        )}
+
+                        <div className="space-y-2">
+                          {guessHistory.map((entry, idx) => (
+                            <div key={idx} className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                              <div className="flex justify-between items-center">
+                                <span className="font-bold text-lg">{entry.guess}</span>
+                                <span className={textSecondary}>{entry.hint}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Reaction Time Game */}
+                  {activeGame === 'reaction' && (
+                    <div className={`${cardBg} p-6 rounded-xl border ${borderColor}`}>
+                      <h3 className="text-2xl font-bold mb-6">Reaction Time ⚡</h3>
+
+                      <div className="max-w-md mx-auto">
+                        <p className={`text-center mb-6 ${textSecondary}`}>
+                          Click the box when it turns green!
+                        </p>
+
+                        <button
+                          onClick={() => {
+                            if (!reactionStartTime && !reactionWaiting) {
+                              startReactionTest();
+                            } else {
+                              handleReactionClick();
+                            }
+                          }}
+                          className={`w-full h-64 rounded-xl text-2xl font-bold transition-all duration-200 ${
+                            reactionWaiting 
+                              ? 'bg-red-500 text-white' 
+                              : reactionStartTime 
+                              ? 'bg-green-500 text-white animate-pulse' 
+                              : theme === 'dark' ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-500 text-white hover:bg-blue-600'
+                          }`}
+                        >
+                          {reactionWaiting ? 'Wait...' : reactionStartTime ? 'Click Now!' : 'Start Test'}
+                        </button>
+
+                        {reactionTimes.length > 0 && (
+                          <div className="mt-6">
+                            <h4 className="font-semibold mb-3">Your Times:</h4>
+                            <div className="space-y-2">
+                              {reactionTimes.map((time, idx) => (
+                                <div key={idx} className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                                  <div className="flex justify-between items-center">
+                                    <span>Attempt {reactionTimes.length - idx}</span>
+                                    <span className="font-bold text-lg">{time}ms</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="mt-4 p-4 bg-blue-500 text-white rounded-lg text-center">
+                              <p className="font-semibold">Average</p>
+                              <p className="text-2xl font-bold">
+                                {Math.round(reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length)}ms
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
-          {activeView === 'calculator' && (
-            <div className={`${cardBg} p-8 rounded-xl border ${borderColor} text-center`}>
-              <Calculator size={48} className="mx-auto mb-4 text-orange-500" />
-              <h2 className="text-2xl font-bold mb-2">Calculator</h2>
-              <p className={textSecondary}>Coming soon!</p>
-            </div>
-          )}
+          {/* Watchlist View */}
+          {activeView === 'watchlist' && <Watchlist theme={theme} />}
+
+          {/* Quick Links View */}
+          {activeView === 'links' && <QuickLinks theme={theme} />}
+
+          {/* Calculator View */}
+          {activeView === 'calculator' && <Calculator theme={theme} />}
+
+          {/* Ai Chat View */}
+          {activeView === 'aichat' && <AiChat theme={theme} />}
 
           {/* Settings View */}
           {activeView === 'settings' && (
