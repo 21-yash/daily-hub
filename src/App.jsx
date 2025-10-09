@@ -8,6 +8,10 @@ import AiChat from './components/aichat/AiChat';
 import AuthModal from './components/auth/AuthModal';
 import { authService } from './services/authService';
 import { getOnThisDay } from './utils/onThisDay';
+import GamesMenu from './components/games/GamesMenu';
+import MemoryMatch from './components/games/MemoryMatch';
+import NumberGuessing from './components/games/NumberGuessing';
+import ReactionTime from './components/games/ReactionTime';
 
 const DailyHub = () => {
   const [theme, setTheme] = useState('light');
@@ -2198,54 +2202,23 @@ const DailyHub = () => {
                 )}
               </div>
             </div>
-          )}
+          )} 
 
           {/* Games View */}
           {activeView === 'games' && (
             <div>
-              <h2 className="text-3xl font-bold mb-6 flex items-center gap-2">
-                <span>🎮</span>
-                Mini Games
-              </h2>
-
               {!activeGame ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Memory Match Card */}
-                  <div 
-                    onClick={() => {
-                      setActiveGame('memory');
-                      initMemoryGame();
-                    }}
-                    className={`${cardBg} p-8 rounded-xl border ${borderColor} text-center cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-lg`}
-                  >
-                    <div className="text-6xl mb-4">🧠</div>
-                    <h3 className="text-xl font-bold mb-2">Memory Match</h3>
-                    <p className={textSecondary}>Match all the pairs of emojis</p>
-                  </div>
-
-                  {/* Number Guessing Card */}
-                  <div 
-                    onClick={() => {
-                      setActiveGame('guess');
-                      initGuessingGame();
-                    }}
-                    className={`${cardBg} p-8 rounded-xl border ${borderColor} text-center cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-lg`}
-                  >
-                    <div className="text-6xl mb-4">🔢</div>
-                    <h3 className="text-xl font-bold mb-2">Number Guessing</h3>
-                    <p className={textSecondary}>Guess the number between 1-100</p>
-                  </div>
-
-                  {/* Reaction Time Card */}
-                  <div 
-                    onClick={() => setActiveGame('reaction')}
-                    className={`${cardBg} p-8 rounded-xl border ${borderColor} text-center cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-lg`}
-                  >
-                    <div className="text-6xl mb-4">⚡</div>
-                    <h3 className="text-xl font-bold mb-2">Reaction Time</h3>
-                    <p className={textSecondary}>Test your reaction speed</p>
-                  </div>
-                </div>
+                <GamesMenu 
+                  onSelectGame={(gameId) => {
+                    setActiveGame(gameId);
+                    if (gameId === 'memory') initMemoryGame();
+                    if (gameId === 'guess') initGuessingGame();
+                  }}
+                  theme={theme}
+                  cardBg={cardBg}
+                  borderColor={borderColor}
+                  textSecondary={textSecondary}
+                />
               ) : (
                 <div>
                   <button
@@ -2255,163 +2228,50 @@ const DailyHub = () => {
                     ← Back to Games
                   </button>
 
-                  {/* Memory Match Game */}
                   {activeGame === 'memory' && (
-                    <div className={`${cardBg} p-6 rounded-xl border ${borderColor}`}>
-                      <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-2xl font-bold">Memory Match 🧠</h3>
-                        <div className="flex items-center gap-4">
-                          <span className={textSecondary}>Moves: {memoryMoves}</span>
-                          <button
-                            onClick={initMemoryGame}
-                            className="px-4 py-2 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95"
-                          >
-                            New Game
-                          </button>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-4 gap-3 max-w-md mx-auto">
-                        {memoryCards.map(card => (
-                          <button
-                            key={card.id}
-                            onClick={() => handleCardClick(card.id)}
-                            disabled={matchedCards.includes(card.id)}
-                            className={`aspect-square text-4xl rounded-xl transition-all duration-300 ${
-                              flippedCards.includes(card.id) || matchedCards.includes(card.id)
-                                ? theme === 'dark' ? 'bg-blue-600' : 'bg-blue-400'
-                                : theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-300 hover:bg-gray-400'
-                            } ${matchedCards.includes(card.id) ? 'opacity-50' : ''}`}
-                          >
-                            {(flippedCards.includes(card.id) || matchedCards.includes(card.id)) ? card.emoji : '?'}
-                          </button>
-                        ))}
-                      </div>
-
-                      {gameWon && (
-                        <div className="mt-6 p-4 bg-green-500 text-white rounded-lg text-center">
-                          <p className="text-xl font-bold">🎉 You Won!</p>
-                          <p>Completed in {memoryMoves} moves</p>
-                        </div>
-                      )}
-                    </div>
+                    <MemoryMatch
+                      memoryCards={memoryCards}
+                      flippedCards={flippedCards}
+                      matchedCards={matchedCards}
+                      memoryMoves={memoryMoves}
+                      gameWon={gameWon}
+                      onCardClick={handleCardClick}
+                      onNewGame={initMemoryGame}
+                      theme={theme}
+                      cardBg={cardBg}
+                      borderColor={borderColor}
+                      textSecondary={textSecondary}
+                    />
                   )}
 
-                  {/* Number Guessing Game */}
                   {activeGame === 'guess' && (
-                    <div className={`${cardBg} p-6 rounded-xl border ${borderColor}`}>
-                      <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-2xl font-bold">Number Guessing 🔢</h3>
-                        <div className="flex items-center gap-4">
-                          <span className={textSecondary}>Attempts: {guessAttempts}</span>
-                          <button
-                            onClick={initGuessingGame}
-                            className="px-4 py-2 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95"
-                          >
-                            New Game
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="max-w-md mx-auto">
-                        <p className={`text-center mb-4 ${textSecondary}`}>
-                          Guess a number between 1 and 100
-                        </p>
-                        
-                        {!gameWon && (
-                          <div className="flex gap-2 mb-6">
-                            <input
-                              type="number"
-                              value={guessNumber}
-                              onChange={(e) => setGuessNumber(e.target.value)}
-                              onKeyPress={(e) => e.key === 'Enter' && handleGuess()}
-                              placeholder="Enter your guess"
-                              min="1"
-                              max="100"
-                              className={`flex-1 px-4 py-3 rounded-lg ${cardBg} border ${borderColor} text-center text-2xl`}
-                            />
-                            <button
-                              onClick={handleGuess}
-                              className="px-6 py-3 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95"
-                            >
-                              Guess
-                            </button>
-                          </div>
-                        )}
-
-                        {gameWon && (
-                          <div className="mb-6 p-4 bg-green-500 text-white rounded-lg text-center">
-                            <p className="text-xl font-bold">🎉 Correct!</p>
-                            <p>You found {targetNumber} in {guessAttempts} attempts</p>
-                          </div>
-                        )}
-
-                        <div className="space-y-2">
-                          {guessHistory.map((entry, idx) => (
-                            <div key={idx} className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                              <div className="flex justify-between items-center">
-                                <span className="font-bold text-lg">{entry.guess}</span>
-                                <span className={textSecondary}>{entry.hint}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
+                    <NumberGuessing
+                      guessNumber={guessNumber}
+                      guessAttempts={guessAttempts}
+                      guessHistory={guessHistory}
+                      gameWon={gameWon}
+                      onGuess={handleGuess}
+                      onNewGame={initGuessingGame}
+                      onInputChange={setGuessNumber}
+                      theme={theme}
+                      cardBg={cardBg}
+                      borderColor={borderColor}
+                      textSecondary={textSecondary}
+                    />
                   )}
 
-                  {/* Reaction Time Game */}
                   {activeGame === 'reaction' && (
-                    <div className={`${cardBg} p-6 rounded-xl border ${borderColor}`}>
-                      <h3 className="text-2xl font-bold mb-6">Reaction Time ⚡</h3>
-
-                      <div className="max-w-md mx-auto">
-                        <p className={`text-center mb-6 ${textSecondary}`}>
-                          Click the box when it turns green!
-                        </p>
-
-                        <button
-                          onClick={() => {
-                            if (!reactionStartTime && !reactionWaiting) {
-                              startReactionTest();
-                            } else {
-                              handleReactionClick();
-                            }
-                          }}
-                          className={`w-full h-64 rounded-xl text-2xl font-bold transition-all duration-200 ${
-                            reactionWaiting 
-                              ? 'bg-red-500 text-white' 
-                              : reactionStartTime 
-                              ? 'bg-green-500 text-white animate-pulse' 
-                              : theme === 'dark' ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-500 text-white hover:bg-blue-600'
-                          }`}
-                        >
-                          {reactionWaiting ? 'Wait...' : reactionStartTime ? 'Click Now!' : 'Start Test'}
-                        </button>
-
-                        {reactionTimes.length > 0 && (
-                          <div className="mt-6">
-                            <h4 className="font-semibold mb-3">Your Times:</h4>
-                            <div className="space-y-2">
-                              {reactionTimes.map((time, idx) => (
-                                <div key={idx} className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                                  <div className="flex justify-between items-center">
-                                    <span>Attempt {reactionTimes.length - idx}</span>
-                                    <span className="font-bold text-lg">{time}ms</span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                            <div className="mt-4 p-4 bg-blue-500 text-white rounded-lg text-center">
-                              <p className="font-semibold">Average</p>
-                              <p className="text-2xl font-bold">
-                                {Math.round(reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length)}ms
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    <ReactionTime
+                      reactionStartTime={reactionStartTime}
+                      reactionWaiting={reactionWaiting}
+                      reactionTimes={reactionTimes}
+                      onStart={startReactionTest}
+                      onClick={handleReactionClick}
+                      theme={theme}
+                      cardBg={cardBg}
+                      borderColor={borderColor}
+                      textSecondary={textSecondary}
+                    />
                   )}
                 </div>
               )}
