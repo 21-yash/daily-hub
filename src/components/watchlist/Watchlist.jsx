@@ -19,6 +19,7 @@ const Watchlist = ({ theme }) => {
   const [watchlist, setWatchlist] = useState([]);
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const [currentItem, setCurrentItem] = useState({
     title: "",
@@ -44,22 +45,49 @@ const Watchlist = ({ theme }) => {
   const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200";
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600";
 
+  // Load watchlist from localStorage on mount
   useEffect(() => {
-    const saved = localStorage.getItem("watchlist");
-    if (saved) {
-      try {
-        setWatchlist(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to load watchlist:", e);
+    const loadWatchlist = () => {
+      const saved = localStorage.getItem("watchlist");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          console.log('📥 Watchlist loaded from localStorage:', parsed.length, 'items');
+          setWatchlist(parsed);
+        } catch (e) {
+          console.error("Failed to load watchlist:", e);
+          setWatchlist([]);
+        }
+      } else {
+        console.log('📭 No watchlist in localStorage');
+        setWatchlist([]);
       }
-    }
+      setIsInitialized(true);
+    };
+
+    loadWatchlist();
+
+    // Listen for storage events to reload data
+    const handleStorageChange = () => {
+      console.log('🔄 Storage event detected, reloading watchlist');
+      loadWatchlist();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
+  // Save watchlist to localStorage when it changes
   useEffect(() => {
-    if (watchlist.length > 0) {
-      localStorage.setItem("watchlist", JSON.stringify(watchlist));
-    }
-  }, [watchlist]);
+    // Don't save during initial load
+    if (!isInitialized) return;
+    
+    console.log('💾 Saving watchlist to localStorage:', watchlist.length, 'items');
+    localStorage.setItem("watchlist", JSON.stringify(watchlist));
+    
+    // Trigger a custom event to notify App.jsx to sync
+    window.dispatchEvent(new CustomEvent('watchlistChange', { detail: watchlist }));
+  }, [watchlist, isInitialized]);
 
   const searchOMDb = async () => {
     if (!searchQuery.trim()) return;
@@ -120,6 +148,7 @@ const Watchlist = ({ theme }) => {
       return;
     }
 
+    console.log('➕ Adding item to watchlist:', newItem.title);
     setWatchlist([newItem, ...watchlist]);
     resetForm();
   };
@@ -128,6 +157,7 @@ const Watchlist = ({ theme }) => {
     if (!currentItem.title.trim()) return;
 
     if (editingItem) {
+      console.log('✏️ Updating item:', currentItem.title);
       setWatchlist(
         watchlist.map((item) =>
           item.id === editingItem.id
@@ -136,8 +166,6 @@ const Watchlist = ({ theme }) => {
         ),
       );
     }
-    // Note: Manual "Add" is removed in favor of the API search workflow.
-    // This function is now only for updating.
 
     resetForm();
   };
@@ -162,7 +190,6 @@ const Watchlist = ({ theme }) => {
   };
 
   const editItem = (item) => {
-    // Make sure all fields exist on the item before setting them
     const itemToEdit = {
       ...{
         title: "",
@@ -182,11 +209,13 @@ const Watchlist = ({ theme }) => {
     setShowAddItem(true);
   };
 
-  // --- UNCHANGED FUNCTIONS ---
   const deleteItem = (id) => {
+    console.log('🗑️ Deleting item:', id);
     setWatchlist(watchlist.filter((item) => item.id !== id));
   };
+
   const updateStatus = (id, newStatus) => {
+    console.log('🔄 Updating status for:', id, 'to', newStatus);
     setWatchlist(
       watchlist.map((item) => {
         if (item.id === id) {
@@ -206,12 +235,14 @@ const Watchlist = ({ theme }) => {
       }),
     );
   };
+
   const filteredItems = watchlist.filter((item) => {
     const matchesStatus =
       filterStatus === "all" || item.status === filterStatus;
     const matchesType = filterType === "all" || item.type === filterType;
     return matchesStatus && matchesType;
   });
+
   const getStatusIcon = (status) => {
     switch (status) {
       case "watching":
@@ -224,6 +255,7 @@ const Watchlist = ({ theme }) => {
         return <Calendar size={16} className="text-gray-500" />;
     }
   };
+
   const getStatusColor = (status) => {
     switch (status) {
       case "watching":
@@ -241,7 +273,7 @@ const Watchlist = ({ theme }) => {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-3xl font-bold flex items-center gap-2">
-          🎬 Watchlist
+          🎬 Watchlist <span className="text-sm text-gray-500">({watchlist.length} items)</span>
         </h2>
         <button
           onClick={() => {
@@ -280,11 +312,10 @@ const Watchlist = ({ theme }) => {
                   }
                   className={`px-4 py-2 rounded-lg ${cardBg} border ${borderColor}`}
                 >
-                  {" "}
-                  <option value="movie">Movie</option>{" "}
-                  <option value="tv-show">TV Show</option>{" "}
-                  <option value="anime">Anime</option>{" "}
-                  <option value="documentary">Documentary</option>{" "}
+                  <option value="movie">Movie</option>
+                  <option value="tv-show">TV Show</option>
+                  <option value="anime">Anime</option>
+                  <option value="documentary">Documentary</option>
                 </select>
                 <select
                   value={currentItem.status}
@@ -293,11 +324,10 @@ const Watchlist = ({ theme }) => {
                   }
                   className={`px-4 py-2 rounded-lg ${cardBg} border ${borderColor}`}
                 >
-                  {" "}
-                  <option value="plan-to-watch">Plan to Watch</option>{" "}
-                  <option value="watching">Watching</option>{" "}
-                  <option value="completed">Completed</option>{" "}
-                  <option value="on-hold">On Hold</option>{" "}
+                  <option value="plan-to-watch">Plan to Watch</option>
+                  <option value="watching">Watching</option>
+                  <option value="completed">Completed</option>
+                  <option value="on-hold">On Hold</option>
                 </select>
                 <input
                   type="text"
@@ -309,10 +339,9 @@ const Watchlist = ({ theme }) => {
                   className={`px-4 py-2 rounded-lg ${cardBg} border ${borderColor}`}
                 />
                 <div>
-                  {" "}
                   <label className={`block text-sm ${textSecondary} mb-1`}>
                     Start Date
-                  </label>{" "}
+                  </label>
                   <input
                     type="date"
                     value={currentItem.startDate}
@@ -323,13 +352,12 @@ const Watchlist = ({ theme }) => {
                       })
                     }
                     className={`w-full px-4 py-2 rounded-lg ${cardBg} border ${borderColor}`}
-                  />{" "}
+                  />
                 </div>
                 <div>
-                  {" "}
                   <label className={`block text-sm ${textSecondary} mb-1`}>
                     End Date
-                  </label>{" "}
+                  </label>
                   <input
                     type="date"
                     value={currentItem.endDate}
@@ -340,13 +368,12 @@ const Watchlist = ({ theme }) => {
                       })
                     }
                     className={`w-full px-4 py-2 rounded-lg ${cardBg} border ${borderColor}`}
-                  />{" "}
+                  />
                 </div>
                 <div className="md:col-span-2">
-                  {" "}
                   <label className={`block text-sm ${textSecondary} mb-1`}>
                     Rating: {currentItem.rating}/10
-                  </label>{" "}
+                  </label>
                   <input
                     type="range"
                     min="0"
@@ -359,7 +386,7 @@ const Watchlist = ({ theme }) => {
                       })
                     }
                     className="w-full"
-                  />{" "}
+                  />
                 </div>
                 <textarea
                   placeholder="Notes"
@@ -442,31 +469,29 @@ const Watchlist = ({ theme }) => {
         </div>
       )}
 
-      {/* --- UNCHANGED FILTER AND DISPLAY LOGIC --- */}
+      {/* --- FILTER AND DISPLAY LOGIC --- */}
       <div className="flex gap-2 mb-6 flex-wrap">
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
           className={`px-4 py-2 rounded-lg ${cardBg} border ${borderColor}`}
         >
-          {" "}
-          <option value="all">All Status</option>{" "}
-          <option value="plan-to-watch">Plan to Watch</option>{" "}
-          <option value="watching">Watching</option>{" "}
-          <option value="completed">Completed</option>{" "}
-          <option value="on-hold">On Hold</option>{" "}
+          <option value="all">All Status</option>
+          <option value="plan-to-watch">Plan to Watch</option>
+          <option value="watching">Watching</option>
+          <option value="completed">Completed</option>
+          <option value="on-hold">On Hold</option>
         </select>
         <select
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
           className={`px-4 py-2 rounded-lg ${cardBg} border ${borderColor}`}
         >
-          {" "}
-          <option value="all">All Types</option>{" "}
-          <option value="movie">Movie</option>{" "}
-          <option value="tv-show">TV Show</option>{" "}
-          <option value="anime">Anime</option>{" "}
-          <option value="documentary">Documentary</option>{" "}
+          <option value="all">All Types</option>
+          <option value="movie">Movie</option>
+          <option value="tv-show">TV Show</option>
+          <option value="anime">Anime</option>
+          <option value="documentary">Documentary</option>
         </select>
       </div>
 
@@ -489,7 +514,7 @@ const Watchlist = ({ theme }) => {
               <div className="flex-1">
                 <div className="flex items-start justify-between">
                   <h4 className="text-lg font-semibold flex-1">
-                    {item.title} ({item.year})
+                    {item.title} {item.year && `(${item.year})`}
                   </h4>
                   <div className="flex gap-1">
                     <button
@@ -507,17 +532,16 @@ const Watchlist = ({ theme }) => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
-                  {" "}
                   <span
                     className={`text-xs px-2 py-1 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}
                   >
                     {item.type}
-                  </span>{" "}
+                  </span>
                   {item.genre && (
                     <span
                       className={`text-xs px-2 py-1 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}
                     >
-                      {item.genre}
+                    {item.genre}
                     </span>
                   )}
                 </div>

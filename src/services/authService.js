@@ -10,18 +10,29 @@ export const authService = {
     return response.json();
   },
 
-  async login(email, password) {
+  async login(username, password) {
     const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ username, password })
     });
     const data = await response.json();
     if (data.token) {
       localStorage.setItem('authToken', data.token);
       localStorage.setItem('userId', data.userId);
+      localStorage.setItem('username', username);
     }
     return data;
+  },
+
+  async getUserInfo() {
+    const token = localStorage.getItem('authToken');
+    const response = await fetch(`${API_URL}/user/info`, {
+      headers: { 
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    return response.json();
   },
 
   async syncData(data) {
@@ -50,6 +61,7 @@ export const authService = {
   logout() {
     localStorage.removeItem('authToken');
     localStorage.removeItem('userId');
+    localStorage.removeItem('username');
   },
 
   isAuthenticated() {

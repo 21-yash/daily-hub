@@ -20,6 +20,8 @@ const DailyHub = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [syncTimeout, setSyncTimeout] = useState(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   
   // Todo state
   const [todos, setTodos] = useState([]);
@@ -89,25 +91,66 @@ const DailyHub = () => {
   const [inputValue, setInputValue] = useState('');
   const [outputValue, setOutputValue] = useState('');
 
+  // Games state
+  const [activeGame, setActiveGame] = useState(null);
+  const [memoryCards, setMemoryCards] = useState([]);
+  const [flippedCards, setFlippedCards] = useState([]);
+  const [matchedCards, setMatchedCards] = useState([]);
+  const [memoryMoves, setMemoryMoves] = useState(0);
+  const [guessNumber, setGuessNumber] = useState('');
+  const [targetNumber, setTargetNumber] = useState(Math.floor(Math.random() * 100) + 1);
+  const [guessAttempts, setGuessAttempts] = useState(0);
+  const [guessHistory, setGuessHistory] = useState([]);
+  const [reactionStartTime, setReactionStartTime] = useState(null);
+  const [reactionWaiting, setReactionWaiting] = useState(false);
+  const [reactionTimes, setReactionTimes] = useState([]);
+  const [gameWon, setGameWon] = useState(false);
+
   // Load data from memory on mount
   useEffect(() => {
     const checkAuth = async () => {
       if (authService.isAuthenticated()) {
         setIsAuthenticated(true);
         try {
+          const userInfo = await authService.getUserInfo();
+          setCurrentUser(userInfo);
+          
           const userData = await authService.getData();
-          if (userData.todos) setTodos(userData.todos);
-          if (userData.passwords) setPasswords(userData.passwords);
-          if (userData.notes) setNotes(userData.notes);
-          if (userData.birthdays) setBirthdays(userData.birthdays);
-          if (userData.links) setLinks(userData.links);
-          if (userData.watchlist) {
-            // Sync watchlist to localStorage for the Watchlist component
+          console.log('📥 Loaded data from server:', userData);
+          
+          // Load all data from server
+          if (userData.todos && userData.todos.length > 0) {
+            setTodos(userData.todos);
+            localStorage.setItem('todos', JSON.stringify(userData.todos));
+          }
+          if (userData.passwords && userData.passwords.length > 0) {
+            setPasswords(userData.passwords);
+            localStorage.setItem('passwords', JSON.stringify(userData.passwords));
+          }
+          if (userData.notes && userData.notes.length > 0) {
+            setNotes(userData.notes);
+            localStorage.setItem('notes', JSON.stringify(userData.notes));
+          }
+          if (userData.birthdays && userData.birthdays.length > 0) {
+            setBirthdays(userData.birthdays);
+            localStorage.setItem('birthdays', JSON.stringify(userData.birthdays));
+          }
+          if (userData.links && userData.links.length > 0) {
+            setLinks(userData.links);
+            localStorage.setItem('links', JSON.stringify(userData.links));
+          }
+          if (userData.watchlist && userData.watchlist.length > 0) {
             localStorage.setItem('watchlist', JSON.stringify(userData.watchlist));
           }
-          if (userData.theme) setTheme(userData.theme);
+          if (userData.theme) {
+            setTheme(userData.theme);
+            localStorage.setItem('theme', userData.theme);
+          }
+          
+          console.log('✅ All data loaded successfully');
         } catch (error) {
           console.error('Failed to load user data:', error);
+          showToast('Failed to load data. Please try logging in again.', 'error');
         }
       } else {
         // Load from localStorage if not authenticated
@@ -139,94 +182,120 @@ const DailyHub = () => {
     checkAuth();
   }, []);
 
-  // Save data
-  useEffect(() => {
-    localStorage.setItem('todos', JSON.stringify(todos));
-    if (isAuthenticated) {
-      syncToServer();
-    }
-  }, [todos]);
-
-  useEffect(() => {
-    localStorage.setItem('theme', theme);
-    if (isAuthenticated) {
-      syncToServer();
-    }
-  }, [theme]);
-
-  useEffect(() => {
-    if (passwords.length > 0 || localStorage.getItem('passwords')) {
-      localStorage.setItem('passwords', JSON.stringify(passwords));
-      if (isAuthenticated) {
-        syncToServer();
-      }
-    }
-  }, [passwords]);
-
-  useEffect(() => {
-    if (notes.length > 0 || localStorage.getItem('notes')) {
-      localStorage.setItem('notes', JSON.stringify(notes));
-      if (isAuthenticated) {
-        syncToServer();
-      }
-    }
-  }, [notes]);
-
+  // Debounced sync function
   const syncToServer = async () => {
+    if (!isAuthenticated) return;
+    
     try {
       const watchlistData = localStorage.getItem('watchlist');
-      await authService.syncData({
-        todos,
-        passwords,
-        notes,
-        birthdays,
-        links,
+      const dataToSync = {
+        todos: todos || [],
+        passwords: passwords || [],
+        notes: notes || [],
+        birthdays: birthdays || [],
+        links: links || [],
         watchlist: watchlistData ? JSON.parse(watchlistData) : [],
-        theme
+        theme: theme || 'light'
+      };
+      
+      console.log('📤 Syncing data to server:', {
+        todos: dataToSync.todos.length,
+        passwords: dataToSync.passwords.length,
+        notes: dataToSync.notes.length,
+        birthdays: dataToSync.birthdays.length,
+        links: dataToSync.links.length
       });
+      
+      const response = await authService.syncData(dataToSync);
+      console.log('✅ Data synced successfully:', response);
     } catch (error) {
-      console.error('Failed to sync data:', error);
+      console.error('❌ Failed to sync data:', error);
+      showToast('Failed to sync data to server', 'error');
     }
   };
 
-  // Save birthdays to localStorage
+  // Debounce data sync to prevent too many API calls
   useEffect(() => {
-    if (birthdays.length > 0 || localStorage.getItem('birthdays')) {
-      localStorage.setItem('birthdays', JSON.stringify(birthdays));
-      if (isAuthenticated) {
-        syncToServer();
+    if (!isAuthenticated) return;
+    
+    if (syncTimeout) {
+      clearTimeout(syncTimeout);
+    }
+    
+    const timeout = setTimeout(() => {
+      syncToServer();
+    }, 2000); // Wait 2 seconds after last change before syncing
+    
+    setSyncTimeout(timeout);
+    
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [todos, passwords, notes, birthdays, links, theme, isAuthenticated]);
+
+  // Save data to localStorage
+  useEffect(() => {
+    // Only save if we have data or if user is not authenticated
+    if (!isAuthenticated) {
+      if (todos.length > 0 || localStorage.getItem('todos')) {
+        localStorage.setItem('todos', JSON.stringify(todos));
       }
     }
-  }, [birthdays]);
+  }, [todos, isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      localStorage.setItem('theme', theme);
+    }
+  }, [theme, isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      if (passwords.length > 0 || localStorage.getItem('passwords')) {
+        localStorage.setItem('passwords', JSON.stringify(passwords));
+      }
+    }
+  }, [passwords, isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      if (notes.length > 0 || localStorage.getItem('notes')) {
+        localStorage.setItem('notes', JSON.stringify(notes));
+      }
+    }
+  }, [notes, isAuthenticated]);
+
+  // Save birthdays to localStorage
+  useEffect(() => {
+    if (!isAuthenticated) {
+      if (birthdays.length > 0 || localStorage.getItem('birthdays')) {
+        localStorage.setItem('birthdays', JSON.stringify(birthdays));
+      }
+    }
+  }, [birthdays, isAuthenticated]);
 
   // Save links to localStorage
   useEffect(() => {
-    if (links.length > 0 || localStorage.getItem('links')) {
-      localStorage.setItem('links', JSON.stringify(links));
-      if (isAuthenticated) {
-        syncToServer();
+    if (!isAuthenticated) {
+      if (links.length > 0 || localStorage.getItem('links')) {
+        localStorage.setItem('links', JSON.stringify(links));
       }
     }
-  }, [links]);
+  }, [links, isAuthenticated]);
 
   // Sync watchlist changes to server
   useEffect(() => {
     if (isAuthenticated) {
-      const syncWatchlist = () => {
+      const handleWatchlistChange = () => {
         syncToServer();
       };
       
-      // Check for watchlist changes every 2 seconds
-      const interval = setInterval(() => {
-        const currentWatchlist = localStorage.getItem('watchlist');
-        if (currentWatchlist) {
-          syncToServer();
-        }
-      }, 2000);
+      // Listen for watchlist changes
+      window.addEventListener('watchlistChange', handleWatchlistChange);
       
-      return () => clearInterval(interval);
+      return () => window.removeEventListener('watchlistChange', handleWatchlistChange);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, todos, passwords, notes, birthdays, links, theme]);
 
   // Check for birthdays and send notifications
   useEffect(() => {
@@ -737,47 +806,81 @@ const DailyHub = () => {
     setCurrentUser(userData);
     setShowAuthModal(false);
     
+    showToast('Loading your data...', 'info');
+    
     // Load user data from server
     try {
       const data = await authService.getData();
+      console.log('📥 Login - Data from server:', data);
+      
+      // Set all data from server - DON'T save to localStorage yet
       setTodos(data.todos || []);
       setPasswords(data.passwords || []);
       setNotes(data.notes || []);
       setBirthdays(data.birthdays || []);
       setLinks(data.links || []);
+      
       if (data.watchlist && data.watchlist.length > 0) {
         localStorage.setItem('watchlist', JSON.stringify(data.watchlist));
-        // Force watchlist component to reload
         window.dispatchEvent(new Event('storage'));
-      } else {
-        localStorage.removeItem('watchlist');
       }
-      if (data.theme) setTheme(data.theme);
-      showToast('Login successful!');
+      
+      if (data.theme) {
+        setTheme(data.theme);
+      }
+      
+      showToast('Login successful! Data loaded.', 'success');
+      
+      // NO PAGE REFRESH - let React handle the state update
+      console.log('✅ Data loaded, no refresh needed');
     } catch (error) {
       console.error('Failed to load user data:', error);
+      showToast('Login successful but failed to load data. Please refresh.', 'warning');
     }
   };
 
   const handleLogout = () => {
-    authService.logout();
-    setIsAuthenticated(false);
-    setCurrentUser(null);
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = async () => {
+    // Sync data one final time before logout
+    showToast('Syncing data before logout...', 'info');
     
-    // Clear all data on logout
-    setTodos([]);
-    setPasswords([]);
-    setNotes([]);
-    setBirthdays([]);
-    setLinks([]);
-    localStorage.removeItem('watchlist');
-    localStorage.removeItem('todos');
-    localStorage.removeItem('passwords');
-    localStorage.removeItem('notes');
-    localStorage.removeItem('birthdays');
-    localStorage.removeItem('links');
+    try {
+      await syncToServer();
+      console.log('✅ Final sync completed');
+    } catch (error) {
+      console.error('Failed final sync:', error);
+    }
     
-    showToast('Logged out successfully', 'info');
+    // Small delay to ensure sync completes
+    setTimeout(() => {
+      authService.logout();
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      
+      // Clear all data on logout
+      setTodos([]);
+      setPasswords([]);
+      setNotes([]);
+      setBirthdays([]);
+      setLinks([]);
+      localStorage.removeItem('watchlist');
+      localStorage.removeItem('todos');
+      localStorage.removeItem('passwords');
+      localStorage.removeItem('notes');
+      localStorage.removeItem('birthdays');
+      localStorage.removeItem('links');
+      
+      showToast('Logged out successfully', 'info');
+      setShowLogoutConfirm(false);
+      
+      // Refresh page after logout
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    }, 1000);
   };
 
   const swapUnits = () => {
@@ -923,21 +1026,6 @@ const DailyHub = () => {
     completed: todos.filter(t => t.completed).length
   };
 
-  // Games state
-  const [activeGame, setActiveGame] = useState(null);
-  const [memoryCards, setMemoryCards] = useState([]);
-  const [flippedCards, setFlippedCards] = useState([]);
-  const [matchedCards, setMatchedCards] = useState([]);
-  const [memoryMoves, setMemoryMoves] = useState(0);
-  const [guessNumber, setGuessNumber] = useState('');
-  const [targetNumber, setTargetNumber] = useState(Math.floor(Math.random() * 100) + 1);
-  const [guessAttempts, setGuessAttempts] = useState(0);
-  const [guessHistory, setGuessHistory] = useState([]);
-  const [reactionStartTime, setReactionStartTime] = useState(null);
-  const [reactionWaiting, setReactionWaiting] = useState(false);
-  const [reactionTimes, setReactionTimes] = useState([]);
-  const [gameWon, setGameWon] = useState(false);
-
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'todos', label: 'Tasks', icon: CheckSquare },
@@ -951,6 +1039,11 @@ const DailyHub = () => {
     { id: 'calculator', label: 'Calculator', icon: CalculatorIcon },
     { id: 'converter', label: 'Unit Converter', icon: Gauge },
   ];
+
+  // Add account view if authenticated
+  if (isAuthenticated) {
+    navItems.splice(1, 0, { id: 'account', label: 'Account', icon: User });
+  }
 
   const bgColor = theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50';
   const cardBg = theme === 'dark' ? 'bg-gray-800' : 'bg-white';
@@ -967,6 +1060,32 @@ const DailyHub = () => {
           onClose={() => setShowAuthModal(false)}
           onSuccess={handleAuthSuccess}
         />
+      )}
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className={`${cardBg} p-8 rounded-xl border ${borderColor} max-w-md w-full mx-4`}>
+            <h3 className="text-2xl font-bold mb-4">Confirm Logout</h3>
+            <p className={`${textSecondary} mb-6`}>
+              Are you sure you want to logout? Your data will be saved to the server.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={confirmLogout}
+                className="flex-1 px-4 py-3 bg-red-500 text-white rounded-lg transition-all duration-200 hover:bg-red-600 hover:scale-105 active:scale-95"
+              >
+                Yes, Logout
+              </button>
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 px-4 py-3 bg-gray-500 text-white rounded-lg transition-all duration-200 hover:bg-gray-600 hover:scale-105 active:scale-95"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Toast Notifications */}
@@ -1070,6 +1189,81 @@ const DailyHub = () => {
 
         {/* Main Content */}
         <main className="flex-1 p-6">
+          {/* Account View */}
+          {activeView === 'account' && isAuthenticated && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6">Account Details</h2>
+              
+              <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-4`}>
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center text-white text-3xl font-bold">
+                    {currentUser?.username?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold">{currentUser?.username || 'User'}</h3>
+                    <p className={textSecondary}>{currentUser?.email || 'No email'}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                    <p className={`text-sm ${textSecondary} mb-1`}>Username</p>
+                    <p className="font-semibold">{currentUser?.username || 'N/A'}</p>
+                  </div>
+                  <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                    <p className={`text-sm ${textSecondary} mb-1`}>Email</p>
+                    <p className="font-semibold">{currentUser?.email || 'N/A'}</p>
+                  </div>
+                  <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                    <p className={`text-sm ${textSecondary} mb-1`}>Account Created</p>
+                    <p className="font-semibold">
+                      {currentUser?.createdAt ? new Date(currentUser.createdAt).toLocaleDateString() : 'N/A'}
+                    </p>
+                  </div>
+                  <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                    <p className={`text-sm ${textSecondary} mb-1`}>Last Sync</p>
+                    <p className="font-semibold">
+                      {currentUser?.lastSync ? new Date(currentUser.lastSync).toLocaleString() : 'Never'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-4`}>
+                <h3 className="text-xl font-semibold mb-4">Data Summary</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-blue-500">{todos.length}</div>
+                    <p className={`text-sm ${textSecondary}`}>Tasks</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-green-500">{passwords.length}</div>
+                    <p className={`text-sm ${textSecondary}`}>Passwords</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-yellow-500">{notes.length}</div>
+                    <p className={`text-sm ${textSecondary}`}>Notes</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-purple-500">{birthdays.length}</div>
+                    <p className={`text-sm ${textSecondary}`}>Birthdays</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`${cardBg} p-6 rounded-xl border border-red-500`}>
+                <h3 className="text-xl font-semibold mb-4 text-red-500">Account Actions</h3>
+                <button 
+                  onClick={handleLogout}
+                  className="w-full px-4 py-3 bg-red-500 text-white rounded-lg transition-all duration-200 hover:bg-red-600 hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <LogOut size={20} />
+                  Logout from Account
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Dashboard View */}
           {activeView === 'dashboard' && (
             <div>
