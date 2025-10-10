@@ -23,7 +23,7 @@ const DailyHub = () => {
   const [syncTimeout, setSyncTimeout] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   
-  // Todo state
+  // Todo state a
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState('');
   const [todoFilter, setTodoFilter] = useState('all');
