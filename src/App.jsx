@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, CheckSquare, Key, StickyNote, Link2, Calculator as CalculatorIcon, Gauge, Moon, Sun, Menu, X, Search, Home, Settings, Download, Upload, Trash2, Eye, EyeOff, Copy, Lock, Bot, Clapperboard, Gamepad2, Cake, LogIn, LogOut, User  } from 'lucide-react';
+import { Plus, CheckSquare, Key, StickyNote, Link2, Calculator as CalculatorIcon, Gauge, Moon, Sun, Menu, X, Search, Home, Settings, Download, Upload, Trash2, Eye, EyeOff, Copy, Lock, Bot, Clapperboard, Gamepad2, Cake, LogIn, LogOut, User, Newspaper, Goal, HandCoins, ScanText, CalendarClock } from 'lucide-react';
 import QuickLinks from './components/links/QuickLinks';
 import Calculator from './components/calculator/Calculator';
 import Watchlist from './components/watchlist/Watchlist';
@@ -14,6 +14,17 @@ import NumberGuessing from './components/games/NumberGuessing';
 import ReactionTime from './components/games/ReactionTime';
 import { encryptionService } from './utils/encryption';
 import { greetingService } from './utils/greetings';
+import TicTacToe from './components/games/TicTacToe';
+import WordGuess from './components/games/WordGuess';
+import TypingTest from './components/games/TypingTest';
+import WhacAMole from './components/games/WhacAMole';
+import SimonSays from './components/games/SimonSays';
+import ConnectFour from './components/games/ConnectFour';
+import HabitTracker from './components/habits/HabitTracker';
+import ExpenseTracker from './components/expenses/ExpenseTracker';
+import TextCounter from './components/tools/TextCounter';
+import NewsFeed from './components/news/NewsFeed';
+import TimeZoneConverter from './components/tools/TimeZoneConverter';
 
 const DailyHub = () => {
   const [theme, setTheme] = useState('light');
@@ -78,8 +89,9 @@ const DailyHub = () => {
   // Dashboard state
   const [currentTime, setCurrentTime] = useState(new Date());
   const [weather, setWeather] = useState(null);
-  const [city, setCity] = useState('Mumbai');
+  const [city, setCity] = useState('Nashik');
   const [weatherLoading, setWeatherLoading] = useState(false);
+  const [greetingData, setGreetingData] = useState(null);
 
   // Birthday state
   const [birthdays, setBirthdays] = useState([]);
@@ -107,6 +119,12 @@ const DailyHub = () => {
   const [reactionWaiting, setReactionWaiting] = useState(false);
   const [reactionTimes, setReactionTimes] = useState([]);
   const [gameWon, setGameWon] = useState(false);
+
+  // Habits state
+const [habits, setHabits] = useState([]);
+
+// Expenses state
+const [expenses, setExpenses] = useState([]);
 
   // Load data from memory on mount
   useEffect(() => {
@@ -153,6 +171,14 @@ const DailyHub = () => {
             setTheme(userData.theme);
             localStorage.setItem('theme', userData.theme);
           }
+          if (userData.habits && userData.habits.length > 0) {
+            setHabits(userData.habits);
+            localStorage.setItem('habits', JSON.stringify(userData.habits));
+          }
+          if (userData.expenses && userData.expenses.length > 0) {
+            setExpenses(userData.expenses);
+            localStorage.setItem('expenses', JSON.stringify(userData.expenses));
+          }
           
           if (userData.masterPassword) {
             const decryptedMasterPass = encryptionService.decryptMasterPassword(userData.masterPassword, userId);
@@ -187,6 +213,8 @@ const DailyHub = () => {
         const savedNotes = localStorage.getItem('notes');
         const savedBirthdays = localStorage.getItem('birthdays');
         const savedLinks = localStorage.getItem('links');
+        const savedHabits = localStorage.getItem('habits');
+        const savedExpenses = localStorage.getItem('expenses');
         
         setTheme(savedTheme);
         if (savedTodos) setTodos(JSON.parse(savedTodos));
@@ -201,6 +229,8 @@ const DailyHub = () => {
         if (savedNotes) setNotes(JSON.parse(savedNotes));
         if (savedBirthdays) setBirthdays(JSON.parse(savedBirthdays));
         if (savedLinks) setLinks(JSON.parse(savedLinks));
+        if (savedHabits) setHabits(JSON.parse(savedHabits));
+        if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
       }
     };
     checkAuth();
@@ -235,6 +265,8 @@ const DailyHub = () => {
         notes: notes || [],
         birthdays: birthdays || [],
         links: links || [],
+        habits: habits || [],
+        expenses: expenses || [],
         watchlist: watchlistData ? JSON.parse(watchlistData) : [],
         theme: theme || 'light',
         masterPassword: encryptedMasterPass, // Encrypted!
@@ -249,6 +281,11 @@ const DailyHub = () => {
       showToast('Failed to sync data to server', 'error');
     }
   };
+
+  // Initialize greeting data once on mount
+  useEffect(() => {
+    setGreetingData(getGreetingData());
+  }, [currentUser]);
 
   // Debounce data sync to prevent too many API calls
   useEffect(() => {
@@ -267,7 +304,7 @@ const DailyHub = () => {
     return () => {
       if (timeout) clearTimeout(timeout);
     };
-  }, [todos, passwords, notes, birthdays, links, theme, isAuthenticated]);
+  }, [todos, passwords, notes, birthdays, links, habits, expenses, theme, isAuthenticated]);
 
   // Save data to localStorage
   useEffect(() => {
@@ -318,6 +355,24 @@ const DailyHub = () => {
       }
     }
   }, [links, isAuthenticated]);
+
+  // Save habits to localStorage
+  useEffect(() => {
+    if (!isAuthenticated) {
+      if (habits.length > 0 || localStorage.getItem('habits')) {
+        localStorage.setItem('habits', JSON.stringify(habits));
+      }
+    }
+  }, [habits, isAuthenticated]);
+
+  // Save expenses to localStorage
+  useEffect(() => {
+    if (!isAuthenticated) {
+      if (expenses.length > 0 || localStorage.getItem('expenses')) {
+        localStorage.setItem('expenses', JSON.stringify(expenses));
+      }
+    }
+  }, [expenses, isAuthenticated]);
 
   // Sync watchlist changes to server
   useEffect(() => {
@@ -411,41 +466,83 @@ const DailyHub = () => {
 
   // Load saved city and fetch weather
   useEffect(() => {
-    const savedCity = localStorage.getItem('city') || 'Mumbai';
+    const savedCity = localStorage.getItem('city') || 'Nashik';
     setCity(savedCity);
     fetchWeather(savedCity);
   }, []);
 
+  const getWeatherDescription = (code) => {
+    const descriptions = {
+      0: { description: 'Clear sky', main: 'Clear' },
+      1: { description: 'Mainly clear', main: 'Clear' },
+      2: { description: 'Partly cloudy', main: 'Clouds' },
+      3: { description: 'Overcast', main: 'Clouds' },
+      45: { description: 'Fog', main: 'Fog' },
+      48: { description: 'Depositing rime fog', main: 'Fog' },
+      51: { description: 'Light drizzle', main: 'Drizzle' },
+      53: { description: 'Moderate drizzle', main: 'Drizzle' },
+      55: { description: 'Dense drizzle', main: 'Drizzle' },
+      61: { description: 'Slight rain', main: 'Rain' },
+      63: { description: 'Moderate rain', main: 'Rain' },
+      65: { description: 'Heavy rain', main: 'Rain' },
+      80: { description: 'Slight rain showers', main: 'Rain' },
+      81: { description: 'Moderate rain showers', main: 'Rain' },
+      82: { description: 'Violent rain showers', main: 'Rain' },
+      95: { description: 'Thunderstorm', main: 'Thunderstorm' },
+      96: { description: 'Thunderstorm with slight hail', main: 'Thunderstorm' },
+      99: { description: 'Thunderstorm with heavy hail', main: 'Thunderstorm' },
+    };
+    return descriptions[code] || { description: 'Unknown weather', main: 'Clear' };
+  };
+
   const fetchWeather = async (cityName) => {
     setWeatherLoading(true);
     try {
-      const response = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?q=${cityName}&appid=YOUR_API_KEY&units=metric`
+      // Step 1: Get latitude and longitude for the city name
+      const geoResponse = await fetch(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${cityName}&count=1&language=en&format=json`
       );
-      if (response.ok) {
-        const data = await response.json();
-        setWeather(data);
-      } else {
-        setWeather({
-          name: cityName,
-          main: { temp: 28, feels_like: 30 },
-          weather: [{ description: 'Unable to fetch weather', main: 'Clear' }]
-        });
+      const geoData = await geoResponse.json();
+
+      if (!geoData.results) {
+        throw new Error('City not found');
       }
+
+      const { latitude, longitude, name } = geoData.results[0];
+
+      // Step 2: Fetch weather using the coordinates
+      const weatherResponse = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code`
+      );
+      const weatherData = await weatherResponse.json();
+      
+      const { description, main } = getWeatherDescription(weatherData.current.weather_code);
+      
+      // Map the data to your existing state structure
+      setWeather({
+        name: name,
+        main: {
+          temp: Math.round(weatherData.current.temperature_2m),
+          // Note: Open-Meteo doesn't provide "feels_like" in this basic call
+          feels_like: Math.round(weatherData.current.temperature_2m), 
+        },
+        weather: [{
+          description: description,
+          main: main,
+        }],
+      });
+
     } catch (error) {
+      console.error("Failed to fetch weather:", error);
+      // Fallback state in case of an error
       setWeather({
         name: cityName,
-        main: { temp: 28, feels_like: 30 },
-        weather: [{ description: 'Weather unavailable', main: 'Clear' }]
+        main: { temp: '--', feels_like: '--' },
+        weather: [{ description: 'Weather unavailable', main: 'Clear' }],
       });
+    } finally {
+      setWeatherLoading(false);
     }
-    setWeatherLoading(false);
-  };
-
-  const updateCity = (newCity) => {
-    setCity(newCity);
-    localStorage.setItem('city', newCity);
-    fetchWeather(newCity);
   };
 
   const getGreetingData = () => {
@@ -1022,6 +1119,343 @@ const DailyHub = () => {
     }
   };
 
+  // --- State for Tic-Tac-Toe ---
+  const [ticTacToeBoard, setTicTacToeBoard] = useState(Array(9).fill(null));
+  const [currentPlayer, setCurrentPlayer] = useState('X');
+  const [ticTacToeWinner, setTicTacToeWinner] = useState(null);
+
+  // --- Logic for Tic-Tac-Toe ---
+  const initTicTacToe = () => {
+    setTicTacToeBoard(Array(9).fill(null));
+    setTicTacToeWinner(null);
+    setCurrentPlayer('X');
+  };
+
+  const checkTicTacToeWinner = (board) => {
+    const lines = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
+      [0, 3, 6], [1, 4, 7], [2, 5, 8], // columns
+      [0, 4, 8], [2, 4, 6]             // diagonals
+    ];
+    for (let i = 0; i < lines.length; i++) {
+      const [a, b, c] = lines[i];
+      if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+        return board[a];
+      }
+    }
+    if (board.every(cell => cell !== null)) return 'Draw';
+    return null;
+  };
+
+  const handleCellClick = (index) => {
+    if (ticTacToeBoard[index] || ticTacToeWinner) return;
+    const newBoard = [...ticTacToeBoard];
+    newBoard[index] = currentPlayer;
+    setTicTacToeBoard(newBoard);
+
+    const winner = checkTicTacToeWinner(newBoard);
+    if (winner) {
+      setTicTacToeWinner(winner);
+    } else {
+      setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X');
+    }
+  };
+
+  const FIVE_LETTER_WORDS = ['REACT', 'HELLO', 'WORLD', 'GAMES', 'THEME', 'STYLE', 'QUERY'];
+  const TYPING_TEXT = "The quick brown fox jumps over the lazy dog. This sentence contains every letter of the alphabet. Practice makes perfect.";
+
+  // --- State for Word Guess ---
+  const [wordGuessSolution, setWordGuessSolution] = useState('');
+  const [wordGuesses, setWordGuesses] = useState([]);
+  const [currentGuess, setCurrentGuess] = useState('');
+  const [wordGuessStatus, setWordGuessStatus] = useState('playing');
+
+  // --- State for Typing Test ---
+  const [typingText] = useState(TYPING_TEXT);
+  const [userInput, setUserInput] = useState('');
+  const [typingStatus, setTypingStatus] = useState('waiting');
+  const [startTime, setStartTime] = useState(null);
+  const [wpm, setWpm] = useState(0);
+  const [accuracy, setAccuracy] = useState(0);
+
+  // --- State for Whac-A-Mole ---
+  const [moles, setMoles] = useState(Array(9).fill(false));
+  const [whacScore, setWhacScore] = useState(0);
+  const [whacTimeLeft, setWhacTimeLeft] = useState(0);
+  const [isWhacActive, setIsWhacActive] = useState(false);
+
+  // --- State for Simon Says ---
+  const [simonSequence, setSimonSequence] = useState([]);
+  const [playerSequence, setPlayerSequence] = useState([]);
+  const [isPlayerTurn, setIsPlayerTurn] = useState(false);
+  const [simonStatus, setSimonStatus] = useState('waiting');
+  const [litButton, setLitButton] = useState(null);
+
+  // --- State for Connect Four ---
+  const [connectFourBoard, setConnectFourBoard] = useState(Array(6).fill(Array(7).fill(null)));
+  const [cfCurrentPlayer, setCfCurrentPlayer] = useState('player');
+  const [connectFourWinner, setConnectFourWinner] = useState(null);
+
+  // --- Logic for Simon Says ---
+  const initSimonGame = () => {
+    setSimonSequence([]);
+    setPlayerSequence([]);
+    setIsPlayerTurn(false);
+    setSimonStatus('playing');
+    // Use a timeout to kick off the first turn
+    setTimeout(addSimonStep, 500);
+  };
+
+  const playSequence = (sequence) => {
+    setIsPlayerTurn(false);
+    let i = 0;
+    const interval = setInterval(() => {
+      setLitButton(sequence[i]);
+      setTimeout(() => setLitButton(null), 400); // Light duration
+      i++;
+      if (i >= sequence.length) {
+        clearInterval(interval);
+        setIsPlayerTurn(true);
+        setPlayerSequence([]);
+      }
+    }, 800); // Time between lights
+  };
+
+  const addSimonStep = () => {
+    const colors = ['green', 'red', 'yellow', 'blue'];
+    const nextColor = colors[Math.floor(Math.random() * 4)];
+    setSimonSequence(currentSequence => {
+    const newSequence = [...currentSequence, nextColor];
+    playSequence(newSequence);
+    return newSequence;
+  });
+  };
+
+  const handleSimonClick = (color) => {
+    const newPlayerSequence = [...playerSequence, color];
+    setPlayerSequence(newPlayerSequence);
+
+    // Check if the latest click was correct
+    if (newPlayerSequence[newPlayerSequence.length - 1] !== simonSequence[newPlayerSequence.length - 1]) {
+      setSimonStatus('lost');
+      showToast(`Game Over! You reached level ${simonSequence.length}`, 'error');
+      return;
+    }
+
+    // Check if the turn is complete
+    if (newPlayerSequence.length === simonSequence.length) {
+      setTimeout(addSimonStep, 1000);
+    }
+  };
+
+  // --- Logic for Connect Four ---
+  const initConnectFour = () => {
+    setConnectFourBoard(Array(6).fill(Array(7).fill(null)));
+    setConnectFourWinner(null);
+    setCfCurrentPlayer('player');
+  };
+
+  const checkForWinner = (board) => {
+      // Check horizontal, vertical, and diagonal wins
+      const ROWS = 6;
+      const COLS = 7;
+      const checkLine = (a, b, c, d) => a !== null && a === b && a === c && a === d;
+
+      for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+              // Horizontal
+              if (c + 3 < COLS && checkLine(board[r][c], board[r][c+1], board[r][c+2], board[r][c+3])) return board[r][c];
+              // Vertical
+              if (r + 3 < ROWS && checkLine(board[r][c], board[r+1][c], board[r+2][c], board[r+3][c])) return board[r][c];
+              // Diagonal (down-right)
+              if (r + 3 < ROWS && c + 3 < COLS && checkLine(board[r][c], board[r+1][c+1], board[r+2][c+2], board[r+3][c+3])) return board[r][c];
+              // Diagonal (up-right)
+              if (r - 3 >= 0 && c + 3 < COLS && checkLine(board[r][c], board[r-1][c+1], board[r-2][c+2], board[r-3][c+3])) return board[r][c];
+          }
+      }
+      // Check for draw
+      if (board.every(row => row.every(cell => cell !== null))) return 'draw';
+      return null;
+  };
+
+  const handleColumnClick = (colIndex) => {
+      if (connectFourWinner || cfCurrentPlayer !== 'player') return;
+
+      let newBoard = connectFourBoard.map(row => [...row]);
+      let rowPlaced = false;
+
+      for (let r = 5; r >= 0; r--) {
+          if (newBoard[r][colIndex] === null) {
+              newBoard[r][colIndex] = 'player';
+              rowPlaced = true;
+              break;
+          }
+      }
+
+      if (!rowPlaced) {
+        showToast('This column is full!', 'warning');
+        return;
+      }
+
+      setConnectFourBoard(newBoard);
+      const winner = checkForWinner(newBoard);
+      if (winner) {
+          setConnectFourWinner(winner);
+      } else {
+          setCfCurrentPlayer('ai');
+          setTimeout(() => handleAiMove(newBoard), 500); // AI moves after a short delay
+      }
+  };
+
+  const handleAiMove = (currentBoard) => {
+      let newBoard = currentBoard.map(row => [...row]);
+      let availableCols = [];
+      for (let c = 0; c < 7; c++) {
+        if (newBoard[0][c] === null) {
+          availableCols.push(c);
+        }
+      }
+
+      if(availableCols.length === 0) return;
+
+      const randomCol = availableCols[Math.floor(Math.random() * availableCols.length)];
+      
+      for (let r = 5; r >= 0; r--) {
+          if (newBoard[r][randomCol] === null) {
+              newBoard[r][randomCol] = 'ai';
+              break;
+          }
+      }
+
+      setConnectFourBoard(newBoard);
+      const winner = checkForWinner(newBoard);
+      if (winner) {
+        setConnectFourWinner(winner);
+      } else {
+        setCfCurrentPlayer('player');
+      }
+  };
+
+  // Add useEffect for game loops/listeners
+  useEffect(() => {
+    // Word Guess Keyboard Listener
+    const handleKeyDown = (e) => {
+      if (activeGame !== 'word-guess' || wordGuessStatus !== 'playing') return;
+      const key = e.key.toUpperCase();
+      if (key === 'ENTER' && currentGuess.length === 5) {
+        submitGuess();
+      } else if (key === 'BACKSPACE') {
+        setCurrentGuess(prev => prev.slice(0, -1));
+      } else if (currentGuess.length < 5 && /^[A-Z]$/.test(key)) {
+        setCurrentGuess(prev => prev + key);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Whac-A-Mole Game Timer
+    let gameInterval;
+    if (isWhacActive && whacTimeLeft > 0) {
+      gameInterval = setInterval(() => {
+        setWhacTimeLeft(time => time - 1);
+        // Make a new mole pop up
+        const randomIndex = Math.floor(Math.random() * 9);
+        setMoles(currentMoles => {
+          const newMoles = Array(9).fill(false);
+          newMoles[randomIndex] = true;
+          return newMoles;
+        });
+      }, 1000);
+    } else if (whacTimeLeft === 0 && isWhacActive) {
+      setIsWhacActive(false);
+    }
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      clearInterval(gameInterval);
+    };
+  }, [activeGame, currentGuess, wordGuessStatus, isWhacActive, whacTimeLeft]);
+
+
+  // --- Logic for Word Guess ---
+  const initWordGuess = () => {
+    const newSolution = FIVE_LETTER_WORDS[Math.floor(Math.random() * FIVE_LETTER_WORDS.length)];
+    setWordGuessSolution(newSolution);
+    setWordGuesses([]);
+    setCurrentGuess('');
+    setWordGuessStatus('playing');
+  };
+
+  const submitGuess = () => {
+    const evaluation = currentGuess.split('').map((letter, index) => {
+      if (letter === wordGuessSolution[index]) return 'correct';
+      if (wordGuessSolution.includes(letter)) return 'present';
+      return 'absent';
+    });
+
+    const newGuesses = [...wordGuesses, { word: currentGuess, evaluation }];
+    setWordGuesses(newGuesses);
+    setCurrentGuess('');
+
+    if (currentGuess === wordGuessSolution) {
+      setWordGuessStatus('won');
+    } else if (newGuesses.length === 6) {
+      setWordGuessStatus('lost');
+    }
+  };
+
+  // --- Logic for Typing Test ---
+  const initTypingTest = () => {
+    setUserInput('');
+    setTypingStatus('waiting');
+    setStartTime(null);
+    setWpm(0);
+    setAccuracy(0);
+  };
+
+  const handleTypingInputChange = (e) => {
+    const value = e.target.value;
+    if (typingStatus === 'waiting') {
+      setTypingStatus('typing');
+      setStartTime(Date.now());
+    }
+    
+    if (value.length >= typingText.length) {
+      // Finish game
+      setUserInput(typingText);
+      setTypingStatus('finished');
+      const endTime = Date.now();
+      const durationInMinutes = (endTime - startTime) / 60000;
+      const wordsTyped = typingText.split(' ').length;
+      setWpm(Math.round(wordsTyped / durationInMinutes));
+      
+      let correctChars = 0;
+      for (let i = 0; i < typingText.length; i++) {
+        if (typingText[i] === value[i]) {
+          correctChars++;
+        }
+      }
+      setAccuracy(Math.round((correctChars / typingText.length) * 100));
+
+    } else {
+      setUserInput(value);
+    }
+  };
+
+  // --- Logic for Whac-A-Mole ---
+  const initWhacAMole = () => {
+    setIsWhacActive(true);
+    setWhacScore(0);
+    setWhacTimeLeft(30); // 30 seconds game
+    setMoles(Array(9).fill(false));
+  };
+
+  const handleMoleWhack = (index) => {
+    if (moles[index]) {
+      setWhacScore(score => score + 1);
+      setMoles(Array(9).fill(false)); // Hide mole after whack
+    }
+  };
+
   const clearAllData = () => {
     const password = prompt('Enter master password to confirm deletion:');
     const saved = localStorage.getItem('masterPassword');
@@ -1055,14 +1489,19 @@ const DailyHub = () => {
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'todos', label: 'Tasks', icon: CheckSquare },
     { id: 'aichat', label: 'Chat with AI', icon: Bot },
+    { id: 'news', label: 'News Feed', icon: Newspaper },
     { id: 'birthdays', label: 'Birthdays', icon: Cake },
     { id: 'passwords', label: 'Passwords', icon: Key },
     { id: 'notes', label: 'Notes', icon: StickyNote },
+    { id: 'habits', label: 'Habits', icon: Goal },
+    { id: 'expenses', label: 'Expenses', icon: HandCoins },
     { id: 'watchlist', label: 'Watchlist', icon: Clapperboard },
     { id: 'games', label: 'Games', icon: Gamepad2 },
     { id: 'links', label: 'Quick Links', icon: Link2 },
     { id: 'calculator', label: 'Calculator', icon: CalculatorIcon },
     { id: 'converter', label: 'Unit Converter', icon: Gauge },
+    { id: 'textcounter', label: 'Text Counter', icon: ScanText },
+    { id: 'timezone', label: 'Time Zones', icon: CalendarClock },
   ];
 
   // Add account view if authenticated
@@ -1294,12 +1733,12 @@ const DailyHub = () => {
             <div>
               <div className="mb-8">
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="text-4xl">{getGreetingData().icon}</span>
-                  <h2 className="text-4xl font-bold">{getGreetingData().greeting}</h2>
+                  <span className="text-4xl">{greetingData?.icon}</span>
+                  <h2 className="text-4xl font-bold">{greetingData?.greeting}</h2>
                 </div>
-                {getGreetingData().quote && (
+                {greetingData?.quote && (
                   <p className={`text-lg ${textSecondary} italic`}>
-                    💡 {getGreetingData().quote}
+                   {greetingData?.quote}
                   </p>
                 )}
                 <p className={`text-lg ${textSecondary}`}>Welcome back to your Daily Hub</p>
@@ -1335,9 +1774,15 @@ const DailyHub = () => {
                     <input
                       type="text"
                       value={city}
-                      onChange={(e) => updateCity(e.target.value)}
-                      onBlur={(e) => fetchWeather(e.target.value)}
+                      onChange={(e) => setCity(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          fetchWeather(city); // Fetch weather only on Enter
+                          localStorage.setItem('city', city); // Save the new city
+                        }
+                      }}
                       className={`px-3 py-1 rounded-lg text-sm ${cardBg} border ${borderColor} w-32`}
+                      placeholder="Enter a city..."
                     />
                   </div>
                   {weatherLoading ? (
@@ -1892,6 +2337,50 @@ const DailyHub = () => {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Habits View */}
+          {activeView === 'habits' && (
+            <HabitTracker 
+              theme={theme} 
+              habits={habits}
+              setHabits={setHabits}
+              showToast={showToast}
+            />
+          )}
+
+          {/* Expenses View */}
+          {activeView === 'expenses' && (
+            <ExpenseTracker 
+              theme={theme}
+              expenses={expenses}
+              setExpenses={setExpenses}
+              showToast={showToast}
+            />
+          )}
+
+          {/* Text Counter View */}
+          {activeView === 'textcounter' && (
+            <TextCounter 
+              theme={theme}
+              showToast={showToast}
+            />
+          )}
+
+          {/* News Feed View */}
+          {activeView === 'news' && (
+            <NewsFeed 
+              theme={theme}
+              showToast={showToast}
+            />
+          )}
+
+          {/* Time Zone View */}
+          {activeView === 'timezone' && (
+            <TimeZoneConverter 
+              theme={theme}
+              showToast={showToast}
+            />
           )}
           
           {/* Tasks View */}
@@ -2495,6 +2984,12 @@ const DailyHub = () => {
                     setActiveGame(gameId);
                     if (gameId === 'memory') initMemoryGame();
                     if (gameId === 'guess') initGuessingGame();
+                    if (gameId === 'tic-tac-toe') initTicTacToe();
+                    if (gameId === 'word-guess') initWordGuess();
+                    if (gameId === 'typing-test') initTypingTest();
+                    if (gameId === 'whac-a-mole') initWhacAMole();
+                    if (gameId === 'simon-says') initSimonGame();
+                    if (gameId === 'connect-four') initConnectFour();
                   }}
                   theme={theme}
                   cardBg={cardBg}
@@ -2553,6 +3048,86 @@ const DailyHub = () => {
                       cardBg={cardBg}
                       borderColor={borderColor}
                       textSecondary={textSecondary}
+                    />
+                  )}
+
+                  {activeGame === 'tic-tac-toe' && (
+                    <TicTacToe
+                      board={ticTacToeBoard}
+                      winner={ticTacToeWinner}
+                      currentPlayer={currentPlayer}
+                      onCellClick={handleCellClick}
+                      onNewGame={initTicTacToe}
+                      theme={theme}
+                      cardBg={cardBg}
+                      borderColor={borderColor}
+                      textSecondary={textSecondary}
+                    />
+                  )}
+
+                  {activeGame === 'word-guess' && (
+                    <WordGuess
+                      guesses={wordGuesses}
+                      currentGuess={currentGuess}
+                      gameStatus={wordGuessStatus}
+                      onNewGame={initWordGuess}
+                      cardBg={cardBg}
+                      borderColor={borderColor}
+                      textSecondary={textSecondary}
+                    />
+                  )}
+
+                  {activeGame === 'typing-test' && (
+                    <TypingTest
+                      textToType={typingText}
+                      userInput={userInput}
+                      gameStatus={typingStatus}
+                      wpm={wpm}
+                      accuracy={accuracy}
+                      onInputChange={handleTypingInputChange}
+                      onNewGame={initTypingTest}
+                      cardBg={cardBg}
+                      borderColor={borderColor}
+                      textSecondary={textSecondary}
+                    />
+                  )}
+
+                  {activeGame === 'whac-a-mole' && (
+                    <WhacAMole
+                      moles={moles}
+                      score={whacScore}
+                      timeLeft={whacTimeLeft}
+                      gameActive={isWhacActive}
+                      onMoleWhack={handleMoleWhack}
+                      onNewGame={initWhacAMole}
+                      cardBg={cardBg}
+                      borderColor={borderColor}
+                    />
+                  )}
+
+                  {activeGame === 'simon-says' && (
+                    <SimonSays
+                      sequence={simonSequence}
+                      playerTurn={isPlayerTurn}
+                      gameStatus={simonStatus}
+                      litButton={litButton}
+                      onButtonClick={handleSimonClick}
+                      onNewGame={initSimonGame}
+                      cardBg={cardBg}
+                      borderColor={borderColor}
+                      textSecondary={textSecondary}
+                    />
+                  )}
+
+                  {activeGame === 'connect-four' && (
+                    <ConnectFour
+                      board={connectFourBoard}
+                      winner={connectFourWinner}
+                      currentPlayer={cfCurrentPlayer}
+                      onColumnClick={handleColumnClick}
+                      onNewGame={initConnectFour}
+                      cardBg={cardBg}
+                      borderColor={borderColor}
                     />
                   )}
                 </div>

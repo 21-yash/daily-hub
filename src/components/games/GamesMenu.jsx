@@ -17,6 +17,42 @@ const GamesMenu = ({ onSelectGame, theme, cardBg, borderColor, textSecondary }) 
       emoji: '⚡',
       title: 'Reaction Time',
       description: 'Test your reaction speed'
+    },
+    {
+      id: 'tic-tac-toe',
+      emoji: '⭕❌',
+      title: 'Tic-Tac-Toe',
+      description: 'Play the classic Tic-Tac-Toe game'
+    },
+    {
+      id: 'word-guess',
+      emoji: '🟩',
+      title: 'Word Guess',
+      description: 'Guess the hidden 5-letter word'
+    },
+    {
+      id: 'typing-test',
+      emoji: '⌨️',
+      title: 'Typing Test',
+      description: 'Check your typing speed and accuracy'
+    },
+    {
+      id: 'whac-a-mole',
+      emoji: '🔨',
+      title: 'Whac-A-Mole',
+      description: 'Whack the moles as they pop up!'
+    },
+    {
+      id: 'simon-says',
+      emoji: '🚥',
+      title: 'Simon Says',
+      description: 'Repeat the growing pattern of colors'
+    },
+    {
+      id: 'connect-four',
+      emoji: '🔵',
+      title: 'Connect Four',
+      description: 'Get four discs in a row to win'
     }
   ];
 
