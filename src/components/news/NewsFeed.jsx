@@ -36,7 +36,7 @@ const NewsFeed = ({ theme, showToast }) => {
   const fetchNews = async () => {
     setLoading(true);
     try {
-      const API_KEY = import.meta.env.VITE_NEWS_KEY || 'd67f1fecf5184a6892f4ed04b8ec70a3'; 
+      const API_KEY = import.meta.env.VITE_NEWS_KEY || '124267d595acf126a308d88c6aab4021'; 
       
       const response = await fetch(
         `https://gnews.io/api/v4/top-headlines?country=${country}&topic=${category}&lang=en&token=${API_KEY}`
