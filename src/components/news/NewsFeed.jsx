@@ -37,17 +37,23 @@ const NewsFeed = ({ theme, showToast }) => {
     setLoading(true);
     try {
       const API_KEY = import.meta.env.VITE_NEWS_KEY || '124267d595acf126a308d88c6aab4021'; 
-      const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
       
-      const response = await fetch(
-        `${proxyUrl}https://gnews.io/api/v4/top-headlines?country=${country}&topic=${category}&lang=en&token=${API_KEY}`
-      );
+      const apiUrl = `https://gnews.io/api/v4/top-headlines?country=${country}&topic=${category}&lang=en&token=${API_KEY}`;
+    
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
+
+      const response = await fetch(proxyUrl);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch news');
+        throw new Error('Failed to fetch news through proxy');
       }
       
-      const data = await response.json();
+      const wrappedData = await response.json();
+      const data = JSON.parse(wrappedData.contents); 
+      if (data.errors) {
+          throw new Error(data.errors[0]);
+      }
+
       setNews(data.articles || []);
       showToast('News updated!', 'success');
     } catch (error) {
