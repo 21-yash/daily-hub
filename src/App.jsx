@@ -12,6 +12,8 @@ import GamesMenu from './components/games/GamesMenu';
 import MemoryMatch from './components/games/MemoryMatch';
 import NumberGuessing from './components/games/NumberGuessing';
 import ReactionTime from './components/games/ReactionTime';
+import { encryptionService } from './utils/encryption';
+import { greetingService } from './utils/greetings';
 
 const DailyHub = () => {
   const [theme, setTheme] = useState('light');
@@ -112,20 +114,25 @@ const DailyHub = () => {
       if (authService.isAuthenticated()) {
         setIsAuthenticated(true);
         try {
+          const userId = localStorage.getItem('userId');
           const userInfo = await authService.getUserInfo();
           setCurrentUser(userInfo);
           
           const userData = await authService.getData();
-          console.log('📥 Loaded data from server:', userData);
+          console.log('📥 Loaded ENCRYPTED data from server:', userData);
+
+          const decryptedPasswords = userData.passwords && userData.passwords.length > 0
+            ? encryptionService.decryptPasswordArray(userData.passwords, userId)
+            : [];
           
           // Load all data from server
           if (userData.todos && userData.todos.length > 0) {
             setTodos(userData.todos);
             localStorage.setItem('todos', JSON.stringify(userData.todos));
           }
-          if (userData.passwords && userData.passwords.length > 0) {
-            setPasswords(userData.passwords);
-            localStorage.setItem('passwords', JSON.stringify(userData.passwords));
+          if (decryptedPasswords.length > 0) {
+            setPasswords(decryptedPasswords); // Decrypted!
+            localStorage.setItem('passwords', JSON.stringify(decryptedPasswords));
           }
           if (userData.notes && userData.notes.length > 0) {
             setNotes(userData.notes);
@@ -147,7 +154,24 @@ const DailyHub = () => {
             localStorage.setItem('theme', userData.theme);
           }
           
-          console.log('✅ All data loaded successfully');
+          if (userData.masterPassword) {
+            const decryptedMasterPass = encryptionService.decryptMasterPassword(userData.masterPassword, userId);
+            localStorage.setItem('masterPassword', decryptedMasterPass);
+            setMasterPasswordSet(true);
+          }
+
+          if (userData.recoveryData) {
+            const decryptedRecovery = encryptionService.decryptRecoveryData(userData.recoveryData, userId);
+            localStorage.setItem('recoveryData', JSON.stringify(decryptedRecovery));
+            setRecoveryQuestion(decryptedRecovery.question);
+            setRecoveryAnswer(decryptedRecovery.answer);
+          }
+ 
+          if (userData.aiChatHistory && userData.aiChatHistory.length > 0) {
+            localStorage.setItem('geminiChatHistory', JSON.stringify(userData.aiChatHistory));
+          }
+          
+          console.log('✅ All data decrypted and loaded successfully');
         } catch (error) {
           console.error('Failed to load user data:', error);
           showToast('Failed to load data. Please try logging in again.', 'error');
@@ -187,24 +211,36 @@ const DailyHub = () => {
     if (!isAuthenticated) return;
     
     try {
+      const userId = localStorage.getItem('userId');
       const watchlistData = localStorage.getItem('watchlist');
+      const masterPass = localStorage.getItem('masterPassword');
+      const recovery = localStorage.getItem('recoveryData');
+      const aiChat = localStorage.getItem('geminiChatHistory');
+      
+      // Encrypt sensitive data before syncing
+      const encryptedMasterPass = masterPass 
+        ? encryptionService.encryptMasterPassword(masterPass, userId)
+        : null;
+      
+      const encryptedRecovery = recovery 
+        ? encryptionService.encryptRecoveryData(JSON.parse(recovery), userId)
+        : null;
+      
+      // Encrypt all password entries
+      const encryptedPasswords = encryptionService.encryptPasswordArray(passwords, userId);
+      
       const dataToSync = {
         todos: todos || [],
-        passwords: passwords || [],
+        passwords: encryptedPasswords, // Now encrypted!
         notes: notes || [],
         birthdays: birthdays || [],
         links: links || [],
         watchlist: watchlistData ? JSON.parse(watchlistData) : [],
-        theme: theme || 'light'
+        theme: theme || 'light',
+        masterPassword: encryptedMasterPass, // Encrypted!
+        recoveryData: encryptedRecovery, // Encrypted!
+        aiChatHistory: aiChat ? JSON.parse(aiChat) : []
       };
-      
-      console.log('📤 Syncing data to server:', {
-        todos: dataToSync.todos.length,
-        passwords: dataToSync.passwords.length,
-        notes: dataToSync.notes.length,
-        birthdays: dataToSync.birthdays.length,
-        links: dataToSync.links.length
-      });
       
       const response = await authService.syncData(dataToSync);
       console.log('✅ Data synced successfully:', response);
@@ -224,7 +260,7 @@ const DailyHub = () => {
     
     const timeout = setTimeout(() => {
       syncToServer();
-    }, 2000); // Wait 2 seconds after last change before syncing
+    }, 500); // Wait 500ms after last change before syncing
     
     setSyncTimeout(timeout);
     
@@ -412,21 +448,10 @@ const DailyHub = () => {
     fetchWeather(newCity);
   };
 
-  const getGreeting = () => {
-    const hour = currentTime.getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    if (hour < 21) return 'Good Evening';
-    return 'Good Night';
-  };
-
-  const getGreetingIcon = () => {
-    const hour = currentTime.getHours();
-    if (hour < 12) return '🌅';
-    if (hour < 17) return '☀️';
-    if (hour < 21) return '🌆';
-    return '🌙';
-  };
+  const getGreetingData = () => {
+    const username = currentUser?.username || null;
+    return greetingService.getGreetingPackage(username);
+  };  
 
   const formatTime = () => {
     return currentTime.toLocaleTimeString('en-US', {
@@ -1269,9 +1294,14 @@ const DailyHub = () => {
             <div>
               <div className="mb-8">
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="text-4xl">{getGreetingIcon()}</span>
-                  <h2 className="text-4xl font-bold">{getGreeting()}!</h2>
+                  <span className="text-4xl">{getGreetingData().icon}</span>
+                  <h2 className="text-4xl font-bold">{getGreetingData().greeting}</h2>
                 </div>
+                {getGreetingData().quote && (
+                  <p className={`text-lg ${textSecondary} italic`}>
+                    💡 {getGreetingData().quote}
+                  </p>
+                )}
                 <p className={`text-lg ${textSecondary}`}>Welcome back to your Daily Hub</p>
               </div>
 
