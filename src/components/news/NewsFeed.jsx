@@ -37,9 +37,10 @@ const NewsFeed = ({ theme, showToast }) => {
     setLoading(true);
     try {
       const API_KEY = import.meta.env.VITE_NEWS_KEY || '124267d595acf126a308d88c6aab4021'; 
+      const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
       
       const response = await fetch(
-        `https://gnews.io/api/v4/top-headlines?country=${country}&topic=${category}&lang=en&token=${API_KEY}`
+        `${proxyUrl}https://gnews.io/api/v4/top-headlines?country=${country}&topic=${category}&lang=en&token=${API_KEY}`
       );
       
       if (!response.ok) {
