@@ -25,6 +25,7 @@ import ExpenseTracker from './components/expenses/ExpenseTracker';
 import TextCounter from './components/tools/TextCounter';
 import NewsFeed from './components/news/NewsFeed';
 import TimeZoneConverter from './components/tools/TimeZoneConverter';
+import CricketScoreboard from './components/cricket/CricketScoreboard';
 
 const DailyHub = () => {
   const [theme, setTheme] = useState('light');
@@ -1502,6 +1503,7 @@ const [expenses, setExpenses] = useState([]);
     { id: 'converter', label: 'Unit Converter', icon: Gauge },
     { id: 'textcounter', label: 'Text Counter', icon: ScanText },
     { id: 'timezone', label: 'Time Zones', icon: CalendarClock },
+    { id: 'cricket', label: 'Cricket Scores', icon: '🏏' },
   ];
 
   // Add account view if authenticated
@@ -2362,6 +2364,14 @@ const [expenses, setExpenses] = useState([]);
           {/* Text Counter View */}
           {activeView === 'textcounter' && (
             <TextCounter 
+              theme={theme}
+              showToast={showToast}
+            />
+          )}
+
+          {/* Cricket Scoreboard View */}
+          {activeView === 'cricket' && (
+            <CricketScoreboard 
               theme={theme}
               showToast={showToast}
             />
