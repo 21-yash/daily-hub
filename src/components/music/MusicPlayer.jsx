@@ -20,6 +20,7 @@ const MusicPlayer = ({ theme, showToast }) => {
   const progressInterval = useRef(null);
   const isLoadingTrack = useRef(false);
   const latestQueue = useRef(queue);
+  const latestIndex = useRef(currentTrackIndex);
 
   const cardBg = theme === 'dark' ? 'bg-gray-800' : 'bg-white';
   const borderColor = theme === 'dark' ? 'border-gray-700' : 'border-gray-200';
@@ -28,6 +29,10 @@ const MusicPlayer = ({ theme, showToast }) => {
   useEffect(() => {
     latestQueue.current = queue;
   }, [queue]);
+
+  useEffect(() => {
+    latestIndex.current = currentTrackIndex;
+  }, [currentTrackIndex]);
 
   // Load YouTube IFrame API
   useEffect(() => {
@@ -107,7 +112,7 @@ const MusicPlayer = ({ theme, showToast }) => {
       
       const currentQueue = latestQueue.current;
       if (currentQueue.length > 0) {
-        const nextIndex = (currentTrackIndex + 1) % currentQueue.length;
+        const nextIndex = (latestIndex.current + 1) % currentQueue.length;
         console.log('Moving to next track:', nextIndex);
         setCurrentTrackIndex(nextIndex);
       }
