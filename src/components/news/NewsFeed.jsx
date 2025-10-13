@@ -5,7 +5,7 @@ const NewsFeed = ({ theme, showToast }) => {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [category, setCategory] = useState('general');
-  const [country, setCountry] = useState('us');
+  const [country, setCountry] = useState('in');
 
   const cardBg = theme === 'dark' ? 'bg-gray-800' : 'bg-white';
   const borderColor = theme === 'dark' ? 'border-gray-700' : 'border-gray-200';
@@ -22,11 +22,11 @@ const NewsFeed = ({ theme, showToast }) => {
   ];
 
   const countries = [
+    { code: 'in', name: 'India', flag: '🇮🇳' },
     { code: 'us', name: 'United States', flag: '🇺🇸' },
     { code: 'gb', name: 'United Kingdom', flag: '🇬🇧' },
     { code: 'ca', name: 'Canada', flag: '🇨🇦' },
     { code: 'au', name: 'Australia', flag: '🇦🇺' },
-    { code: 'in', name: 'India', flag: '🇮🇳' }
   ];
 
   useEffect(() => {

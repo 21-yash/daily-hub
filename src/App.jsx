@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, CheckSquare, Key, StickyNote, Link2, Calculator as CalculatorIcon, Gauge, Moon, Sun, Menu, X, Search, Home, Settings, Download, Upload, Trash2, Eye, EyeOff, Copy, Lock, Bot, Clapperboard, Gamepad2, Cake, LogIn, LogOut, User, Newspaper, Goal, HandCoins, ScanText, CalendarClock } from 'lucide-react';
+import { Plus, CheckSquare, Key, StickyNote, Link2, Calculator as CalculatorIcon, Gauge, Moon, Sun, Menu, X, Search, Home, Settings, Download, Upload, Trash2, Eye, EyeOff, Copy, Lock, Bot, Clapperboard, Gamepad2, Cake, LogIn, LogOut, User, Newspaper, Goal, HandCoins, ScanText, CalendarClock, Music } from 'lucide-react';
 import QuickLinks from './components/links/QuickLinks';
 import Calculator from './components/calculator/Calculator';
 import Watchlist from './components/watchlist/Watchlist';
@@ -26,6 +26,7 @@ import TextCounter from './components/tools/TextCounter';
 import NewsFeed from './components/news/NewsFeed';
 import TimeZoneConverter from './components/tools/TimeZoneConverter';
 import CricketScoreboard from './components/cricket/CricketScoreboard';
+import MusicPlayer from './components/music/MusicPlayer';
 
 const DailyHub = () => {
   const [theme, setTheme] = useState('light');
@@ -1497,13 +1498,15 @@ const [expenses, setExpenses] = useState([]);
     { id: 'habits', label: 'Habits', icon: Goal },
     { id: 'expenses', label: 'Expenses', icon: HandCoins },
     { id: 'watchlist', label: 'Watchlist', icon: Clapperboard },
+    { id: 'cricket', label: 'Cricket Scores', icon: '🏏' },
+    { id: 'music', label: 'Music Player', icon: Music },
     { id: 'games', label: 'Games', icon: Gamepad2 },
     { id: 'links', label: 'Quick Links', icon: Link2 },
     { id: 'calculator', label: 'Calculator', icon: CalculatorIcon },
     { id: 'converter', label: 'Unit Converter', icon: Gauge },
     { id: 'textcounter', label: 'Text Counter', icon: ScanText },
     { id: 'timezone', label: 'Time Zones', icon: CalendarClock },
-    { id: 'cricket', label: 'Cricket Scores', icon: '🏏' },
+    
   ];
 
   // Add account view if authenticated
@@ -3156,6 +3159,11 @@ const [expenses, setExpenses] = useState([]);
 
           {/* Ai Chat View */}
           {activeView === 'aichat' && <AiChat theme={theme} />}
+
+          {/* Music Player View */}
+          {activeView === 'music' && (
+            <MusicPlayer theme={theme} showToast={showToast} />
+          )}
 
           {/* Settings View */}
           {activeView === 'settings' && (
