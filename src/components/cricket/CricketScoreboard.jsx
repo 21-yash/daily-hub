@@ -15,7 +15,7 @@ const CricketScoreboard = ({ theme, showToast }) => {
     const borderColor = theme === 'dark' ? 'border-gray-700' : 'border-gray-200';
     const textSecondary = theme === 'dark' ? 'text-gray-400' : 'text-gray-600';
 
-    const BACKEND_URL = 'http://localhost:3001';
+    const BACKEND_URL = 'https://backend-4z7z.onrender.com';
 
     useEffect(() => {
         checkBackendHealth();
