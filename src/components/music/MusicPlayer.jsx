@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Plus, Trash2, Music, Search, Loader, X } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Plus, Trash2, Music, Search, Loader, X, Repeat, Repeat1, Shuffle } from 'lucide-react';
 
 const MusicPlayer = ({ theme, showToast }) => {
   const [queue, setQueue] = useState([]);
@@ -10,6 +10,9 @@ const MusicPlayer = ({ theme, showToast }) => {
   const [volume, setVolume] = useState(70);
   const [isMuted, setIsMuted] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
+  const [loopMode, setLoopMode] = useState('none'); // 'none', 'all', 'one'
+  const [shuffleEnabled, setShuffleEnabled] = useState(false);
+  const [playedTracks, setPlayedTracks] = useState([]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -21,6 +24,11 @@ const MusicPlayer = ({ theme, showToast }) => {
   const isLoadingTrack = useRef(false);
   const latestQueue = useRef(queue);
   const latestIndex = useRef(currentTrackIndex);
+  const latestLoopMode = useRef(loopMode);
+  const latestShuffleEnabled = useRef(shuffleEnabled);
+  const latestPlayedTracks = useRef(playedTracks);
+  const draggedItem = useRef(null);
+  const draggedOverItem = useRef(null);
 
   const cardBg = theme === 'dark' ? 'bg-gray-800' : 'bg-white';
   const borderColor = theme === 'dark' ? 'border-gray-700' : 'border-gray-200';
@@ -33,6 +41,18 @@ const MusicPlayer = ({ theme, showToast }) => {
   useEffect(() => {
     latestIndex.current = currentTrackIndex;
   }, [currentTrackIndex]);
+
+  useEffect(() => {
+    latestLoopMode.current = loopMode;
+  }, [loopMode]);
+
+  useEffect(() => {
+    latestShuffleEnabled.current = shuffleEnabled;
+  }, [shuffleEnabled]);
+
+  useEffect(() => {
+    latestPlayedTracks.current = playedTracks;
+  }, [playedTracks]);
 
   // Load YouTube IFrame API
   useEffect(() => {
@@ -104,15 +124,72 @@ const MusicPlayer = ({ theme, showToast }) => {
       setIsPlaying(false);
       stopProgressTracking();
     } else if (event.data === window.YT.PlayerState.ENDED) {
-      console.log('Current queue from ref:', latestQueue.current);
-      console.log('Track ended - playing next');
+      console.log('Track ended');
       stopProgressTracking();
       setIsPlaying(false);
       setCurrentTime(0);
       
       const currentQueue = latestQueue.current;
-      if (currentQueue.length > 0) {
-        const nextIndex = (latestIndex.current + 1) % currentQueue.length;
+      const currentIndex = latestIndex.current;
+      const currentLoopMode = latestLoopMode.current;
+      const isShuffleOn = latestShuffleEnabled.current;
+      const alreadyPlayed = latestPlayedTracks.current;
+      
+      console.log('Loop mode:', currentLoopMode);
+      console.log('Shuffle enabled:', isShuffleOn);
+      
+      if (currentQueue.length === 0) return;
+      
+      // Handle loop one - replay the same track
+      if (currentLoopMode === 'one') {
+        console.log('Loop one - replaying current track');
+        setTimeout(() => {
+          if (playerRef.current && playerRef.current.playVideo) {
+            playerRef.current.seekTo(0, true);
+            playerRef.current.playVideo();
+            setIsPlaying(true);
+          }
+        }, 100);
+        return;
+      }
+      
+      // Handle shuffle mode
+      if (isShuffleOn) {
+        const unplayedTracks = currentQueue
+          .map((track, idx) => idx)
+          .filter(idx => !alreadyPlayed.includes(idx));
+        
+        console.log('Unplayed tracks:', unplayedTracks);
+        
+        if (unplayedTracks.length > 0) {
+          // Pick random from unplayed tracks
+          const randomIndex = unplayedTracks[Math.floor(Math.random() * unplayedTracks.length)];
+          console.log('Playing random unplayed track:', randomIndex);
+          setPlayedTracks(prev => [...prev, randomIndex]);
+          setCurrentTrackIndex(randomIndex);
+        } else if (currentLoopMode === 'all') {
+          // All tracks played, reset and start again
+          console.log('All tracks played, resetting shuffle');
+          setPlayedTracks([0]);
+          setCurrentTrackIndex(0);
+        } else {
+          // No loop, shuffle exhausted
+          console.log('Shuffle complete, stopping');
+          setIsPlaying(false);
+        }
+        return;
+      }
+      
+      // Normal sequential playback
+      const nextIndex = (currentIndex + 1) % currentQueue.length;
+      console.log('Next index:', nextIndex, 'Current index:', currentIndex);
+      
+      if (nextIndex === 0 && currentLoopMode !== 'all') {
+        // Reached the end and not looping all
+        console.log('Queue ended, stopping playback');
+        setIsPlaying(false);
+      } else {
+        // Continue to next track
         console.log('Moving to next track:', nextIndex);
         setCurrentTrackIndex(nextIndex);
       }
@@ -202,6 +279,31 @@ const MusicPlayer = ({ theme, showToast }) => {
     }
   }, [currentTrackIndex, playerReady]);
 
+  // Effect for Media Session API
+  useEffect(() => {
+    if ('mediaSession' in navigator && currentTrack) {
+      navigator.mediaSession.metadata = new window.MediaMetadata({
+        title: currentTrack.title,
+        artist: currentTrack.artist,
+        artwork: [
+          { src: currentTrack.thumbnail, sizes: '96x96', type: 'image/jpeg' },
+          { src: currentTrack.thumbnail, sizes: '128x128', type: 'image/jpeg' },
+          { src: currentTrack.thumbnail, sizes: '192x192', type: 'image/jpeg' },
+          { src: currentTrack.thumbnail, sizes: '256x256', type: 'image/jpeg' },
+          { src: currentTrack.thumbnail, sizes: '384x384', type: 'image/jpeg' },
+          { src: currentTrack.thumbnail, sizes: '512x512', type: 'image/jpeg' },
+        ]
+      });
+
+      // Set up action handlers
+      navigator.mediaSession.setActionHandler('play', playPause);
+      navigator.mediaSession.setActionHandler('pause', playPause);
+      navigator.mediaSession.setActionHandler('previoustrack', prevTrack);
+      navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
+    }
+  }, [currentTrack, playPause, prevTrack, nextTrack]);
+
+
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
       showToast('Please enter a song name to search', 'warning');
@@ -275,34 +377,71 @@ const MusicPlayer = ({ theme, showToast }) => {
     showToast('Track removed', 'info');
   };
 
-  const playPause = () => {
+  const playPause = React.useCallback(() => {
     if (!playerRef.current || queue.length === 0) return;
     if (isPlaying) {
       playerRef.current.pauseVideo();
     } else {
       playerRef.current.playVideo();
     }
-  };
+  }, [queue, isPlaying]);
 
-  const nextTrack = () => {
-    if (queue.length > 0) {
+  const nextTrack = React.useCallback(() => {
+    if (queue.length === 0) return;
+    
+    if (shuffleEnabled) {
+      const unplayedTracks = queue
+        .map((track, idx) => idx)
+        .filter(idx => !playedTracks.includes(idx));
+      
+      if (unplayedTracks.length > 0) {
+        const randomIndex = unplayedTracks[Math.floor(Math.random() * unplayedTracks.length)];
+        setPlayedTracks(prev => [...prev, randomIndex]);
+        setCurrentTrackIndex(randomIndex);
+      } else if (loopMode === 'all') {
+        const randomIndex = Math.floor(Math.random() * queue.length);
+        setPlayedTracks([randomIndex]);
+        setCurrentTrackIndex(randomIndex);
+      } else {
+        showToast('All tracks played', 'info');
+      }
+    } else {
       const nextIndex = (currentTrackIndex + 1) % queue.length;
-      console.log('Next track clicked:', nextIndex);
       setCurrentTrackIndex(nextIndex);
     }
-  };
+  }, [queue, currentTrackIndex, shuffleEnabled, playedTracks, loopMode, showToast]);
 
-  const prevTrack = () => {
-    if (queue.length > 0) {
+  const prevTrack = React.useCallback(() => {
+    if (queue.length === 0) return;
+    
+    if (shuffleEnabled) {
+      const unplayedTracks = queue
+        .map((track, idx) => idx)
+        .filter(idx => !playedTracks.includes(idx) && idx !== currentTrackIndex);
+      
+      if (unplayedTracks.length > 0) {
+        const randomIndex = unplayedTracks[Math.floor(Math.random() * unplayedTracks.length)];
+        setPlayedTracks(prev => [...prev, randomIndex]);
+        setCurrentTrackIndex(randomIndex);
+      } else {
+        let randomIndex;
+        do {
+          randomIndex = Math.floor(Math.random() * queue.length);
+        } while (randomIndex === currentTrackIndex && queue.length > 1);
+        setCurrentTrackIndex(randomIndex);
+      }
+    } else {
       const prevIndex = currentTrackIndex === 0 ? queue.length - 1 : currentTrackIndex - 1;
-      console.log('Previous track clicked:', prevIndex);
       setCurrentTrackIndex(prevIndex);
     }
-  };
+  }, [queue, currentTrackIndex, shuffleEnabled, playedTracks]);
 
   const selectTrack = (index) => {
     console.log('Track selected:', index);
     setCurrentTrackIndex(index);
+    if (shuffleEnabled) {
+      setPlayedTracks(prev => [...prev, index]);
+    }
   };
 
   const handleSeek = (e) => {
@@ -331,6 +470,65 @@ const MusicPlayer = ({ theme, showToast }) => {
     }
   };
 
+  const toggleLoop = () => {
+    setLoopMode(prev => {
+      if (prev === 'none') return 'all';
+      if (prev === 'all') return 'one';
+      return 'none';
+    });
+    console.log('Loop mode toggled');
+  };
+
+  const toggleShuffle = () => {
+    setShuffleEnabled(prev => {
+      const newValue = !prev;
+      if (newValue) {
+        // Starting shuffle, mark current track as played
+        setPlayedTracks([currentTrackIndex]);
+        console.log('Shuffle enabled, tracking from current track');
+      } else {
+        // Stopping shuffle, clear played tracks
+        setPlayedTracks([]);
+        console.log('Shuffle disabled, cleared played tracks');
+      }
+      return newValue;
+    });
+  };
+
+  const handleDragStart = (index) => {
+    draggedItem.current = index;
+  };
+
+  const handleDragEnter = (index) => {
+    draggedOverItem.current = index;
+  };
+
+  const handleDragEnd = () => {
+    if (draggedItem.current === null || draggedOverItem.current === null) return;
+    if (draggedItem.current === draggedOverItem.current) return;
+
+    const newQueue = [...queue];
+    const draggedItemContent = newQueue[draggedItem.current];
+    
+    // Remove dragged item
+    newQueue.splice(draggedItem.current, 1);
+    // Insert at new position
+    newQueue.splice(draggedOverItem.current, 0, draggedItemContent);
+    
+    // Update current track index
+    if (draggedItem.current === currentTrackIndex) {
+      setCurrentTrackIndex(draggedOverItem.current);
+    } else if (draggedItem.current < currentTrackIndex && draggedOverItem.current >= currentTrackIndex) {
+      setCurrentTrackIndex(currentTrackIndex - 1);
+    } else if (draggedItem.current > currentTrackIndex && draggedOverItem.current <= currentTrackIndex) {
+      setCurrentTrackIndex(currentTrackIndex + 1);
+    }
+    
+    setQueue(newQueue);
+    draggedItem.current = null;
+    draggedOverItem.current = null;
+  };
+
   const dismissSearch = () => {
     setShowSearch(false);
     setSearchResults([]);
@@ -357,10 +555,10 @@ const MusicPlayer = ({ theme, showToast }) => {
       {showSearch ? (
         <div className={`${cardBg} p-6 rounded-xl border ${borderColor}`}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-lg">Search for Music on YouTube</h3>
+            <h3 className="font-semibold text-lg">Search for Music</h3>
             <button 
               onClick={dismissSearch}
-              className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              className="p-2 rounded-lg hover:bg-gray-500 dark:hover:bg-gray-700 transition-colors"
               title="Dismiss search"
             >
               <X size={20} />
@@ -390,9 +588,13 @@ const MusicPlayer = ({ theme, showToast }) => {
               {searchResults.map(track => (
                 <div 
                   key={track.id} 
-                  className={`flex items-center gap-3 p-3 rounded-lg ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-colors`}
+                  className={`flex items-center gap-3 p-3 rounded-lg ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-500'} transition-colors`}
                 >
-                  <img src={track.thumbnail} alt={track.title} className="w-12 h-12 rounded object-cover" />
+                  <img 
+                    src={track.thumbnail} 
+                    alt={track.title} 
+                    className="w-12 h-12 rounded object-cover" 
+                  />
                   <div className="flex-1 overflow-hidden">
                     <p className="font-medium line-clamp-1">{track.title}</p>
                     <p className={`text-sm ${textSecondary} line-clamp-1`}>{track.artist}</p>
@@ -465,49 +667,77 @@ const MusicPlayer = ({ theme, showToast }) => {
         </div>
         
         {/* Controls */}
-        <div className="flex items-center justify-center gap-6 mb-4">
-          <button 
-            onClick={prevTrack} 
-            disabled={queue.length === 0} 
-            className="p-3 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
-          >
-            <SkipBack size={24} />
-          </button>
-          <button 
-            onClick={playPause} 
-            disabled={queue.length === 0} 
-            className="p-4 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-all hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-          >
-            {isPlaying ? <Pause size={28} /> : <Play size={28} />}
-          </button>
-          <button 
-            onClick={nextTrack} 
-            disabled={queue.length === 0} 
-            className="p-3 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
-          >
-            <SkipForward size={24} />
-          </button>
-        </div>
-        
-        {/* Volume Control */}
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={toggleMute} 
-            className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-          >
-            {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-          </button>
-          <input 
-            type="range" 
-            min="0" 
-            max="100" 
-            value={isMuted ? 0 : volume} 
-            onChange={handleVolumeChange} 
-            className="flex-1 h-2 bg-gray-300 dark:bg-gray-700 rounded-lg cursor-pointer"
-          />
-          <span className={`text-sm ${textSecondary} w-10 text-right`}>
-            {isMuted ? 0 : volume}%
-          </span>
+        <div className="flex items-center justify-between gap-4 mb-4">
+          {/* Volume Control - Left Side */}
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => handleVolumeChange({ target: { value: volume > 0 ? 0 : 70 }})} 
+              className="p-1.5 rounded-lg hover:bg-gray-500 dark:hover:bg-gray-700 transition-colors"
+            >
+              {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
+            </button>
+            <input 
+              type="range" 
+              min="0" 
+              max="100" 
+              value={volume} 
+              onChange={handleVolumeChange} 
+              className="w-24 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-lg cursor-pointer"
+            />
+            <span className={`text-sm ${textSecondary} w-12`}>
+              {volume}%
+            </span>
+          </div>
+
+          {/* Playback Controls - Center */}
+          <div className="flex items-center justify-center gap-2">
+            <button 
+              onClick={toggleShuffle}
+              className={`p-2 rounded-lg transition-colors ${
+                shuffleEnabled 
+                  ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                  : 'hover:bg-gray-500 dark:hover:bg-gray-700'
+              }`}
+              title={shuffleEnabled ? "Shuffle: On" : "Shuffle: Off"}
+            >
+              <Shuffle size={18} />
+            </button>
+            <button 
+              onClick={prevTrack} 
+              disabled={queue.length === 0} 
+              className="p-2.5 rounded-full hover:bg-gray-500 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+            >
+              <SkipBack size={20} />
+            </button>
+            <button 
+              onClick={playPause} 
+              disabled={queue.length === 0} 
+              className="p-3.5 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-all hover:scale-110 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+            >
+              {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+            </button>
+            <button 
+              onClick={nextTrack} 
+              disabled={queue.length === 0} 
+              className="p-2.5 rounded-full hover:bg-gray-500 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+            >
+              <SkipForward size={20} />
+            </button>
+            <button 
+              onClick={toggleLoop}
+              className={`p-2 rounded-lg transition-colors ${
+                loopMode !== 'none'
+                  ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                  : 'hover:bg-gray-500 dark:hover:bg-gray-700'
+              }`}
+              title={loopMode === 'none' ? 'Loop: Off' : loopMode === 'all' ? 'Loop: All' : 'Loop: One'}
+            >
+              {loopMode === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
+            </button>
+          </div>
+
+          {/* Empty space for balance */}
+          <div className="w-36"></div>
         </div>
       </div>
 
@@ -525,11 +755,16 @@ const MusicPlayer = ({ theme, showToast }) => {
             {queue.map((track, index) => (
               <div 
                 key={track.id} 
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragEnter={() => handleDragEnter(index)}
+                onDragEnd={handleDragEnd}
+                onDragOver={(e) => e.preventDefault()}
                 onClick={() => selectTrack(index)} 
-                className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
+                className={`flex items-center justify-between p-3 rounded-lg cursor-move transition-colors ${
                   index === currentTrackIndex 
                     ? 'bg-blue-500 text-white' 
-                    : `hover:bg-gray-100 dark:hover:bg-gray-700`
+                    : `hover:bg-gray-500 dark:hover:bg-gray-700`
                 }`}
               >
                 <div className="flex items-center gap-3 flex-1 overflow-hidden">
@@ -560,7 +795,7 @@ const MusicPlayer = ({ theme, showToast }) => {
                   className={`p-2 rounded-lg transition-colors ${
                     index === currentTrackIndex 
                       ? 'hover:bg-white/20' 
-                      : 'hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : 'hover:bg-gray-500 dark:hover:bg-gray-600'
                   }`}
                 >
                   <Trash2 size={16} />
