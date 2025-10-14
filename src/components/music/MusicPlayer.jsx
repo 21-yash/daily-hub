@@ -279,30 +279,7 @@ const MusicPlayer = ({ theme, showToast }) => {
     }
   }, [currentTrackIndex, playerReady]);
 
-  // Effect for Media Session API
-  useEffect(() => {
-    if ('mediaSession' in navigator && currentTrack) {
-      navigator.mediaSession.metadata = new window.MediaMetadata({
-        title: currentTrack.title,
-        artist: currentTrack.artist,
-        artwork: [
-          { src: currentTrack.thumbnail, sizes: '96x96', type: 'image/jpeg' },
-          { src: currentTrack.thumbnail, sizes: '128x128', type: 'image/jpeg' },
-          { src: currentTrack.thumbnail, sizes: '192x192', type: 'image/jpeg' },
-          { src: currentTrack.thumbnail, sizes: '256x256', type: 'image/jpeg' },
-          { src: currentTrack.thumbnail, sizes: '384x384', type: 'image/jpeg' },
-          { src: currentTrack.thumbnail, sizes: '512x512', type: 'image/jpeg' },
-        ]
-      });
-
-      // Set up action handlers
-      navigator.mediaSession.setActionHandler('play', playPause);
-      navigator.mediaSession.setActionHandler('pause', playPause);
-      navigator.mediaSession.setActionHandler('previoustrack', prevTrack);
-      navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
-    }
-  }, [currentTrack, playPause, prevTrack, nextTrack]);
-
+  
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -377,16 +354,16 @@ const MusicPlayer = ({ theme, showToast }) => {
     showToast('Track removed', 'info');
   };
 
-  const playPause = React.useCallback(() => {
+  const playPause = () => {
     if (!playerRef.current || queue.length === 0) return;
     if (isPlaying) {
       playerRef.current.pauseVideo();
     } else {
       playerRef.current.playVideo();
     }
-  }, [queue, isPlaying]);
+  };
 
-  const nextTrack = React.useCallback(() => {
+  const nextTrack = () => {
     if (queue.length === 0) return;
     
     if (shuffleEnabled) {
@@ -396,45 +373,55 @@ const MusicPlayer = ({ theme, showToast }) => {
       
       if (unplayedTracks.length > 0) {
         const randomIndex = unplayedTracks[Math.floor(Math.random() * unplayedTracks.length)];
+        console.log('Next: Playing random unplayed track:', randomIndex);
         setPlayedTracks(prev => [...prev, randomIndex]);
         setCurrentTrackIndex(randomIndex);
       } else if (loopMode === 'all') {
+        // Reset shuffle
         const randomIndex = Math.floor(Math.random() * queue.length);
+        console.log('Next: Resetting shuffle, playing:', randomIndex);
         setPlayedTracks([randomIndex]);
         setCurrentTrackIndex(randomIndex);
       } else {
+        console.log('Next: All tracks played, no loop');
         showToast('All tracks played', 'info');
       }
     } else {
       const nextIndex = (currentTrackIndex + 1) % queue.length;
+      console.log('Next track clicked:', nextIndex);
       setCurrentTrackIndex(nextIndex);
     }
-  }, [queue, currentTrackIndex, shuffleEnabled, playedTracks, loopMode, showToast]);
+  };
 
-  const prevTrack = React.useCallback(() => {
+  const prevTrack = () => {
     if (queue.length === 0) return;
     
     if (shuffleEnabled) {
+      // In shuffle mode, go to a random unplayed track or any track if all played
       const unplayedTracks = queue
         .map((track, idx) => idx)
         .filter(idx => !playedTracks.includes(idx) && idx !== currentTrackIndex);
       
       if (unplayedTracks.length > 0) {
         const randomIndex = unplayedTracks[Math.floor(Math.random() * unplayedTracks.length)];
+        console.log('Prev: Playing random unplayed track:', randomIndex);
         setPlayedTracks(prev => [...prev, randomIndex]);
         setCurrentTrackIndex(randomIndex);
       } else {
+        // All played, pick any random track
         let randomIndex;
         do {
           randomIndex = Math.floor(Math.random() * queue.length);
         } while (randomIndex === currentTrackIndex && queue.length > 1);
+        console.log('Prev: All played, random track:', randomIndex);
         setCurrentTrackIndex(randomIndex);
       }
     } else {
       const prevIndex = currentTrackIndex === 0 ? queue.length - 1 : currentTrackIndex - 1;
+      console.log('Previous track clicked:', prevIndex);
       setCurrentTrackIndex(prevIndex);
     }
-  }, [queue, currentTrackIndex, shuffleEnabled, playedTracks]);
+  };
 
   const selectTrack = (index) => {
     console.log('Track selected:', index);
