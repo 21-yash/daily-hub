@@ -28,6 +28,8 @@
     "gh-pages": "^6.3.0",
     "lucide-react": "^0.545.0",
     "mongoose": "^8.19.1",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^5.4.296",
     "postcss": "^8.5.6",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

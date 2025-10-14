@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, CheckSquare, Key, StickyNote, Link2, Calculator as CalculatorIcon, Gauge, Moon, Sun, Menu, X, Search, Home, Settings, Download, Upload, Trash2, Eye, EyeOff, Copy, Lock, Bot, Clapperboard, Gamepad2, Cake, LogIn, LogOut, User, Newspaper, Goal, HandCoins, ScanText, CalendarClock, Music } from 'lucide-react';
+import { Plus, CheckSquare, Key, StickyNote, Link2, Calculator as CalculatorIcon, Gauge, Moon, Sun, Menu, X, Search, Home, Settings, Download, Upload, Trash2, Eye, EyeOff, Copy, Lock, Bot, Clapperboard, Gamepad2, Cake, LogIn, LogOut, User, Newspaper, Goal, HandCoins, ScanText, CalendarClock, Music, FileText } from 'lucide-react';
 import QuickLinks from './components/links/QuickLinks';
 import Calculator from './components/calculator/Calculator';
 import Watchlist from './components/watchlist/Watchlist';
@@ -27,6 +27,7 @@ import NewsFeed from './components/news/NewsFeed';
 import TimeZoneConverter from './components/tools/TimeZoneConverter';
 import CricketScoreboard from './components/cricket/CricketScoreboard';
 import MusicPlayer from './components/music/MusicPlayer';
+import PdfTools from './components/tools/PdfTools';
 
 const DailyHub = () => {
   const [theme, setTheme] = useState('light');
@@ -1506,6 +1507,7 @@ const [expenses, setExpenses] = useState([]);
     { id: 'converter', label: 'Unit Converter', icon: Gauge },
     { id: 'textcounter', label: 'Text Counter', icon: ScanText },
     { id: 'timezone', label: 'Time Zones', icon: CalendarClock },
+    { id: 'pdftools', label: 'PDF Tools', icon: FileText },
     
   ];
 
@@ -1743,7 +1745,7 @@ const [expenses, setExpenses] = useState([]);
                 </div>
                 {greetingData?.quote && (
                   <p className={`text-lg ${textSecondary} italic`}>
-                   {greetingData?.quote}
+                  {greetingData?.quote}
                   </p>
                 )}
                 <p className={`text-lg ${textSecondary}`}>Welcome back to your Daily Hub</p>
@@ -1782,8 +1784,8 @@ const [expenses, setExpenses] = useState([]);
                       onChange={(e) => setCity(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
-                          fetchWeather(city); // Fetch weather only on Enter
-                          localStorage.setItem('city', city); // Save the new city
+                          fetchWeather(city);
+                          localStorage.setItem('city', city);
                         }
                       }}
                       className={`px-3 py-1 rounded-lg text-sm ${cardBg} border ${borderColor} w-32`}
@@ -1799,11 +1801,11 @@ const [expenses, setExpenses] = useState([]);
                       <div className="flex items-center gap-4 mb-4">
                         <div className="text-6xl">
                           {weather.weather?.[0]?.main === 'Clear' ? '☀️' :
-                           weather.weather?.[0]?.main === 'Clouds' ? '☁️' :
-                           weather.weather?.[0]?.main === 'Rain' ? '🌧️' :
-                           weather.weather?.[0]?.main === 'Snow' ? '❄️' :
-                           weather.weather?.[0]?.main === 'Thunderstorm' ? '⛈️' :
-                           '🌤️'}
+                          weather.weather?.[0]?.main === 'Clouds' ? '☁️' :
+                          weather.weather?.[0]?.main === 'Rain' ? '🌧️' :
+                          weather.weather?.[0]?.main === 'Snow' ? '❄️' :
+                          weather.weather?.[0]?.main === 'Thunderstorm' ? '⛈️' :
+                          '🌤️'}
                         </div>
                         <div>
                           <div className="text-5xl font-bold">{Math.round(weather.main?.temp || 28)}°C</div>
@@ -1820,48 +1822,64 @@ const [expenses, setExpenses] = useState([]);
               </div>
 
               {/* Quick Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105`}>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer`} onClick={() => setActiveView('todos')}>
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className={textSecondary}>Total Tasks</h3>
-                    <CheckSquare className="text-blue-500" size={24} />
+                    <h3 className={`text-xs ${textSecondary}`}>Tasks</h3>
+                    <CheckSquare className="text-blue-500" size={20} />
                   </div>
-                  <p className="text-3xl font-bold">{stats.total}</p>
-                  <p className={`text-sm ${textSecondary} mt-1`}>
+                  <p className="text-2xl font-bold">{stats.total}</p>
+                  <p className={`text-xs ${textSecondary} mt-1`}>
                     {stats.active} active
                   </p>
                 </div>
                 
-                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105`}>
+                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer`} onClick={() => setActiveView('passwords')}>
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className={textSecondary}>Passwords</h3>
-                    <Key className="text-green-500" size={24} />
+                    <h3 className={`text-xs ${textSecondary}`}>Passwords</h3>
+                    <Key className="text-green-500" size={20} />
                   </div>
-                  <p className="text-3xl font-bold">{passwords.length}</p>
-                  <p className={`text-sm ${textSecondary} mt-1`}>
-                    Secured
-                  </p>
+                  <p className="text-2xl font-bold">{passwords.length}</p>
+                  <p className={`text-xs ${textSecondary} mt-1`}>Secured</p>
                 </div>
                 
-                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105`}>
+                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer`} onClick={() => setActiveView('notes')}>
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className={textSecondary}>Notes</h3>
-                    <StickyNote className="text-yellow-500" size={24} />
+                    <h3 className={`text-xs ${textSecondary}`}>Notes</h3>
+                    <StickyNote className="text-yellow-500" size={20} />
                   </div>
-                  <p className="text-3xl font-bold">{notes.length}</p>
-                  <p className={`text-sm ${textSecondary} mt-1`}>
-                    Saved
+                  <p className="text-2xl font-bold">{notes.length}</p>
+                  <p className={`text-xs ${textSecondary} mt-1`}>Saved</p>
+                </div>
+
+                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer`} onClick={() => setActiveView('birthdays')}>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className={`text-xs ${textSecondary}`}>Birthdays</h3>
+                    <Cake className="text-pink-500" size={20} />
+                  </div>
+                  <p className="text-2xl font-bold">{birthdays.length}</p>
+                  <p className={`text-xs ${textSecondary} mt-1`}>
+                    {getUpcomingBirthdays()[0] ? `${getUpcomingBirthdays()[0].daysUntil}d next` : 'None'}
                   </p>
                 </div>
 
-                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105`}>
+                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer`} onClick={() => setActiveView('habits')}>
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className={textSecondary}>Birthdays</h3>
-                    <span className="text-2xl">🎂</span>
+                    <h3 className={`text-xs ${textSecondary}`}>Habits</h3>
+                    <Goal className="text-purple-500" size={20} />
                   </div>
-                  <p className="text-3xl font-bold">{birthdays.length}</p>
-                  <p className={`text-sm ${textSecondary} mt-1`}>
-                    {getUpcomingBirthdays()[0] ? `${getUpcomingBirthdays()[0].daysUntil} days next` : 'None upcoming'}
+                  <p className="text-2xl font-bold">{habits.length}</p>
+                  <p className={`text-xs ${textSecondary} mt-1`}>Tracked</p>
+                </div>
+
+                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer`} onClick={() => setActiveView('expenses')}>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className={`text-xs ${textSecondary}`}>Expenses</h3>
+                    <HandCoins className="text-orange-500" size={20} />
+                  </div>
+                  <p className="text-2xl font-bold">{expenses.length}</p>
+                  <p className={`text-xs ${textSecondary} mt-1`}>
+                    ₹{expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0).toFixed(0)}
                   </p>
                 </div>
               </div>
@@ -1887,8 +1905,8 @@ const [expenses, setExpenses] = useState([]);
                         <p className="font-semibold">{birthday.name}</p>
                         <p className={`text-sm ${textSecondary}`}>
                           {birthday.daysUntil === 0 ? '🎂 Today!' : 
-                           birthday.daysUntil === 1 ? '📅 Tomorrow' : 
-                           `📅 In ${birthday.daysUntil} days`}
+                          birthday.daysUntil === 1 ? '📅 Tomorrow' : 
+                          `📅 In ${birthday.daysUntil} days`}
                         </p>
                       </div>
                     ))}
@@ -1930,8 +1948,8 @@ const [expenses, setExpenses] = useState([]);
                       <p className="font-semibold text-sm">{holiday.name}</p>
                       <p className={`text-xs ${textSecondary}`}>
                         {holiday.daysUntil === 0 ? 'Today!' : 
-                         holiday.daysUntil === 1 ? 'Tomorrow' : 
-                         `In ${holiday.daysUntil} days`}
+                        holiday.daysUntil === 1 ? 'Tomorrow' : 
+                        `In ${holiday.daysUntil} days`}
                       </p>
                     </div>
                   ))}
@@ -1939,7 +1957,7 @@ const [expenses, setExpenses] = useState([]);
               </div>
 
               {/* Recent Activity */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 {/* Recent Tasks */}
                 <div className={`${cardBg} p-6 rounded-xl border ${borderColor}`}>
                   <div className="flex items-center justify-between mb-4">
@@ -2016,15 +2034,15 @@ const [expenses, setExpenses] = useState([]);
               </div>
 
               {/* Quick Actions */}
-              <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mt-6`}>
+              <div className={`${cardBg} p-6 rounded-xl border ${borderColor}`}>
                 <h3 className="text-xl font-semibold mb-4">Quick Actions</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                   <button
                     onClick={() => setActiveView('todos')}
                     className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-blue-600/20 hover:bg-blue-600/30' : 'bg-blue-50 hover:bg-blue-100'} transition-all duration-200 hover:scale-105 active:scale-95`}
                   >
-                    <Plus className="mx-auto mb-2 text-blue-500" size={24} />
-                    <p className="text-sm font-medium">Add Task</p>
+                    <CheckSquare className="mx-auto mb-2 text-blue-500" size={24} />
+                    <p className="text-sm font-medium">Tasks</p>
                   </button>
                   <button
                     onClick={() => setActiveView('passwords')}
@@ -2038,14 +2056,28 @@ const [expenses, setExpenses] = useState([]);
                     className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-yellow-600/20 hover:bg-yellow-600/30' : 'bg-yellow-50 hover:bg-yellow-100'} transition-all duration-200 hover:scale-105 active:scale-95`}
                   >
                     <StickyNote className="mx-auto mb-2 text-yellow-500" size={24} />
-                    <p className="text-sm font-medium">New Note</p>
+                    <p className="text-sm font-medium">Notes</p>
                   </button>
                   <button
-                    onClick={() => setActiveView('calculator')}
+                    onClick={() => setActiveView('habits')}
                     className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-purple-600/20 hover:bg-purple-600/30' : 'bg-purple-50 hover:bg-purple-100'} transition-all duration-200 hover:scale-105 active:scale-95`}
                   >
-                    <CalculatorIcon className="mx-auto mb-2 text-purple-500" size={24} />
-                    <p className="text-sm font-medium">Calculator</p>
+                    <Goal className="mx-auto mb-2 text-purple-500" size={24} />
+                    <p className="text-sm font-medium">Habits</p>
+                  </button>
+                  <button
+                    onClick={() => setActiveView('expenses')}
+                    className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-orange-600/20 hover:bg-orange-600/30' : 'bg-orange-50 hover:bg-orange-100'} transition-all duration-200 hover:scale-105 active:scale-95`}
+                  >
+                    <HandCoins className="mx-auto mb-2 text-orange-500" size={24} />
+                    <p className="text-sm font-medium">Expenses</p>
+                  </button>
+                  <button
+                    onClick={() => setActiveView('music')}
+                    className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-pink-600/20 hover:bg-pink-600/30' : 'bg-pink-50 hover:bg-pink-100'} transition-all duration-200 hover:scale-105 active:scale-95`}
+                  >
+                    <Music className="mx-auto mb-2 text-pink-500" size={24} />
+                    <p className="text-sm font-medium">Music</p>
                   </button>
                 </div>
               </div>
@@ -3163,6 +3195,14 @@ const [expenses, setExpenses] = useState([]);
           {/* Music Player View */}
           {activeView === 'music' && (
             <MusicPlayer theme={theme} showToast={showToast} />
+          )}
+
+          {/* PDF Tools View */}
+          {activeView === 'pdftools' && (
+            <PdfTools
+              theme={theme}
+              showToast={showToast}
+            />
           )}
 
           {/* Settings View */}
