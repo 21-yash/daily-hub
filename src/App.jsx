@@ -30,6 +30,7 @@ import MusicPlayer from './components/music/MusicPlayer';
 import PdfTools from './components/tools/PdfTools';
 
 const DailyHub = () => {
+  const [isLoading, setIsLoading] = useState(true);
   const [theme, setTheme] = useState('light');
   const [activeView, setActiveView] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -124,14 +125,15 @@ const DailyHub = () => {
   const [gameWon, setGameWon] = useState(false);
 
   // Habits state
-const [habits, setHabits] = useState([]);
+  const [habits, setHabits] = useState([]);
 
-// Expenses state
-const [expenses, setExpenses] = useState([]);
+  // Expenses state
+  const [expenses, setExpenses] = useState([]);
 
   // Load data from memory on mount
   useEffect(() => {
     const checkAuth = async () => {
+      setIsLoading(true);
       if (authService.isAuthenticated()) {
         setIsAuthenticated(true);
         try {
@@ -140,73 +142,109 @@ const [expenses, setExpenses] = useState([]);
           setCurrentUser(userInfo);
           
           const userData = await authService.getData();
-          console.log('📥 Loaded ENCRYPTED data from server:', userData);
+          console.log('📥 Loaded data from server:', userData);
 
-          const decryptedPasswords = userData.passwords && userData.passwords.length > 0
-            ? encryptionService.decryptPasswordArray(userData.passwords, userId)
-            : [];
+          // Decrypt passwords first if they exist
+          let decryptedPasswords = [];
+          if (userData.passwords && Array.isArray(userData.passwords) && userData.passwords.length > 0) {
+            try {
+              decryptedPasswords = encryptionService.decryptPasswordArray(userData.passwords, userId);
+              console.log('✅ Decrypted passwords:', decryptedPasswords.length);
+            } catch (error) {
+              console.error('❌ Failed to decrypt passwords:', error);
+            }
+          }
+
+          // Decrypt master password if it exists
+          if (userData.masterPassword) {
+            try {
+              const decryptedMasterPass = encryptionService.decryptMasterPassword(userData.masterPassword, userId);
+              localStorage.setItem('masterPassword', decryptedMasterPass);
+              setMasterPasswordSet(true);
+              console.log('✅ Master password decrypted');
+            } catch (error) {
+              console.error('❌ Failed to decrypt master password:', error);
+            }
+          }
+
+          // Decrypt recovery data if it exists
+          if (userData.recoveryData) {
+            try {
+              const decryptedRecovery = encryptionService.decryptRecoveryData(userData.recoveryData, userId);
+              localStorage.setItem('recoveryData', JSON.stringify(decryptedRecovery));
+              setRecoveryQuestion(decryptedRecovery.question);
+              setRecoveryAnswer(decryptedRecovery.answer);
+              console.log('✅ Recovery data decrypted');
+            } catch (error) {
+              console.error('❌ Failed to decrypt recovery data:', error);
+            }
+          }
           
-          // Load all data from server
-          if (userData.todos && userData.todos.length > 0) {
-            setTodos(userData.todos);
-            localStorage.setItem('todos', JSON.stringify(userData.todos));
-          }
-          if (decryptedPasswords.length > 0) {
-            setPasswords(decryptedPasswords); // Decrypted!
-            localStorage.setItem('passwords', JSON.stringify(decryptedPasswords));
-          }
-          if (userData.notes && userData.notes.length > 0) {
-            setNotes(userData.notes);
-            localStorage.setItem('notes', JSON.stringify(userData.notes));
-          }
-          if (userData.birthdays && userData.birthdays.length > 0) {
-            setBirthdays(userData.birthdays);
-            localStorage.setItem('birthdays', JSON.stringify(userData.birthdays));
-          }
-          if (userData.links && userData.links.length > 0) {
-            setLinks(userData.links);
-            localStorage.setItem('links', JSON.stringify(userData.links));
-          }
-          if (userData.watchlist && userData.watchlist.length > 0) {
-            localStorage.setItem('watchlist', JSON.stringify(userData.watchlist));
-          }
+          // Set todos - ALWAYS set state, even if empty array
+          const loadedTodos = userData.todos || [];
+          setTodos(loadedTodos);
+          localStorage.setItem('todos', JSON.stringify(loadedTodos));
+          console.log('✅ Loaded todos:', loadedTodos.length);
+
+          // Set passwords - ALWAYS set state, even if empty
+          setPasswords(decryptedPasswords);
+          localStorage.setItem('passwords', JSON.stringify(decryptedPasswords));
+          console.log('✅ Loaded passwords:', decryptedPasswords.length);
+
+          // Set notes - ALWAYS set state
+          const loadedNotes = userData.notes || [];
+          setNotes(loadedNotes);
+          localStorage.setItem('notes', JSON.stringify(loadedNotes));
+          console.log('✅ Loaded notes:', loadedNotes.length);
+
+          // Set birthdays - ALWAYS set state
+          const loadedBirthdays = userData.birthdays || [];
+          setBirthdays(loadedBirthdays);
+          localStorage.setItem('birthdays', JSON.stringify(loadedBirthdays));
+          console.log('✅ Loaded birthdays:', loadedBirthdays.length);
+
+          // Set links - ALWAYS set state
+          const loadedLinks = userData.links || [];
+          setLinks(loadedLinks);
+          localStorage.setItem('links', JSON.stringify(loadedLinks));
+          console.log('✅ Loaded links:', loadedLinks.length);
+
+          // Set habits - ALWAYS set state
+          const loadedHabits = userData.habits || [];
+          setHabits(loadedHabits);
+          localStorage.setItem('habits', JSON.stringify(loadedHabits));
+          console.log('✅ Loaded habits:', loadedHabits.length);
+
+          // Set expenses - ALWAYS set state
+          const loadedExpenses = userData.expenses || [];
+          setExpenses(loadedExpenses);
+          localStorage.setItem('expenses', JSON.stringify(loadedExpenses));
+          console.log('✅ Loaded expenses:', loadedExpenses.length);
+
+          // Set watchlist
+          const loadedWatchlist = userData.watchlist || [];
+          localStorage.setItem('watchlist', JSON.stringify(loadedWatchlist));
+          console.log('✅ Loaded watchlist:', loadedWatchlist.length);
+
+          // Set theme
           if (userData.theme) {
             setTheme(userData.theme);
             localStorage.setItem('theme', userData.theme);
-          }
-          if (userData.habits && userData.habits.length > 0) {
-            setHabits(userData.habits);
-            localStorage.setItem('habits', JSON.stringify(userData.habits));
-          }
-          if (userData.expenses && userData.expenses.length > 0) {
-            setExpenses(userData.expenses);
-            localStorage.setItem('expenses', JSON.stringify(userData.expenses));
-          }
-          
-          if (userData.masterPassword) {
-            const decryptedMasterPass = encryptionService.decryptMasterPassword(userData.masterPassword, userId);
-            localStorage.setItem('masterPassword', decryptedMasterPass);
-            setMasterPasswordSet(true);
+            console.log('✅ Loaded theme:', userData.theme);
           }
 
-          if (userData.recoveryData) {
-            const decryptedRecovery = encryptionService.decryptRecoveryData(userData.recoveryData, userId);
-            localStorage.setItem('recoveryData', JSON.stringify(decryptedRecovery));
-            setRecoveryQuestion(decryptedRecovery.question);
-            setRecoveryAnswer(decryptedRecovery.answer);
-          }
- 
-          if (userData.aiChatHistory && userData.aiChatHistory.length > 0) {
-            localStorage.setItem('geminiChatHistory', JSON.stringify(userData.aiChatHistory));
-          }
+          // Set AI chat history
+          const loadedAiChat = userData.aiChatHistory || [];
+          localStorage.setItem('geminiChatHistory', JSON.stringify(loadedAiChat));
+          console.log('✅ Loaded AI chat history:', loadedAiChat.length);
           
           console.log('✅ All data decrypted and loaded successfully');
         } catch (error) {
-          console.error('Failed to load user data:', error);
+          console.error('❌ Failed to load user data:', error);
           showToast('Failed to load data. Please try logging in again.', 'error');
         }
       } else {
-        // Load from localStorage if not authenticated
+        // Not authenticated - load from localStorage
         const savedTheme = localStorage.getItem('theme') || 'light';
         const savedTodos = localStorage.getItem('todos');
         const savedMasterPassword = localStorage.getItem('masterPassword');
@@ -234,7 +272,10 @@ const [expenses, setExpenses] = useState([]);
         if (savedLinks) setLinks(JSON.parse(savedLinks));
         if (savedHabits) setHabits(JSON.parse(savedHabits));
         if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
+        
+        console.log('✅ Loaded data from localStorage (not authenticated)');
       }
+      setIsLoading(false);
     };
     checkAuth();
   }, []);
@@ -292,7 +333,7 @@ const [expenses, setExpenses] = useState([]);
 
   // Debounce data sync to prevent too many API calls
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (isLoading || !isAuthenticated) return;
     
     if (syncTimeout) {
       clearTimeout(syncTimeout);
@@ -300,14 +341,14 @@ const [expenses, setExpenses] = useState([]);
     
     const timeout = setTimeout(() => {
       syncToServer();
-    }, 500); // Wait 500ms after last change before syncing
+    }, 500);
     
     setSyncTimeout(timeout);
     
     return () => {
       if (timeout) clearTimeout(timeout);
     };
-  }, [todos, passwords, notes, birthdays, links, habits, expenses, theme, isAuthenticated]);
+  }, [todos, passwords, notes, birthdays, links, habits, expenses, theme, isAuthenticated, isLoading]);
 
   // Save data to localStorage
   useEffect(() => {
@@ -944,6 +985,8 @@ const [expenses, setExpenses] = useState([]);
       setNotes(data.notes || []);
       setBirthdays(data.birthdays || []);
       setLinks(data.links || []);
+      setExpenses(data.expenses || []);
+      setHabits(data.habits || []);
       
       if (data.watchlist && data.watchlist.length > 0) {
         localStorage.setItem('watchlist', JSON.stringify(data.watchlist));
@@ -997,6 +1040,8 @@ const [expenses, setExpenses] = useState([]);
       localStorage.removeItem('notes');
       localStorage.removeItem('birthdays');
       localStorage.removeItem('links');
+      localStorage.removeItem('habits');
+      localStorage.removeItem('expenses');
       
       showToast('Logged out successfully', 'info');
       setShowLogoutConfirm(false);
