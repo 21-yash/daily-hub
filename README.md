@@ -99,7 +99,7 @@ You will need to **build your own backend API** and update the `src/services/aut
 
 1.  **Clone the repo**
     ```sh
-    git clone [https://github.com/21-yash/dailyhub.git](https://github.com/21-yash/dailyhub.git)
+    git clone [https://github.com/21-yash/daily-hub.git](https://github.com/21-yash/daily-hub.git)
     cd dailyhub
     ```
 
