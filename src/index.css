@@ -108,7 +108,6 @@ code {
 .main-content {
   flex: 1;
   min-width: 0;
-  padding-right: 1rem;
 }
 
 @media (min-width: 1024px) {

@@ -2050,17 +2050,22 @@ const DailyHub = () => {
               backgroundColor: 'rgba(0, 0, 0, 0.5)'
             }}
           />
-          <div className={`fixed top-0 left-0 h-full w-72 ${cardBg} z-50 shadow-2xl transform transition-transform duration-300`}>
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-6">
+          <div className={`fixed top-0 left-0 h-full w-72 ${cardBg} z-50 shadow-2xl transform transition-transform duration-300 flex flex-col`}>
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold">Menu</h2>
                 <button onClick={() => setShowDrawer(false)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
                   <X size={20} />
                 </button>
               </div>
-              
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 overscroll-contain">
               <div className="space-y-1">
                 {[
+                  { id: 'dashboard', label: 'Dashboard', icon: Home },
+                  { id: 'todos', label: 'Tasks', icon: CheckSquare },
+                  { id: 'notes', label: 'Notes', icon: StickyNote },
                   { id: 'news', label: 'News', icon: Newspaper },
                   { id: 'birthdays', label: 'Birthdays', icon: Cake },
                   { id: 'passwords', label: 'Passwords', icon: Key },
@@ -2670,7 +2675,7 @@ const DailyHub = () => {
                     </div>
                   )}
 
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredNotes.map(note => (
                 <div key={note.id} className={`${cardBg} p-4 rounded-2xl border ${borderColor}`}>
                   <h4 className="font-bold mb-2">{note.title}</h4>
@@ -2738,7 +2743,7 @@ const DailyHub = () => {
               </div>
             )}
 
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {getUpcomingBirthdays().map(birthday => (
                 <div key={birthday.id} className={`${cardBg} p-4 rounded-2xl border ${borderColor}`}>
                   <div className="flex items-start justify-between">
@@ -2957,7 +2962,7 @@ const DailyHub = () => {
                   </div>
                 )}
 
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredPasswords.map(pwd => (
                     <div key={pwd.id} className={`${cardBg} p-4 rounded-2xl border ${borderColor}`}>
                       {/* Delete Confirmation */}
