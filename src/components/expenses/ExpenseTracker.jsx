@@ -6,7 +6,11 @@ import {
   TrendingDown,
   Calendar,
   PieChart,
+  X
 } from "lucide-react";
+import { expenseService } from '../../services/api';
+import { authService } from '../../services/authService';
+import { syncQueue } from '../../services/syncQueue';
 
 const ExpenseTracker = ({ theme, expenses, setExpenses, showToast }) => {
   const [showAddExpense, setShowAddExpense] = useState(false);
@@ -34,20 +38,24 @@ const ExpenseTracker = ({ theme, expenses, setExpenses, showToast }) => {
     { name: "other", icon: "💰", color: "bg-gray-500" },
   ];
 
-  const addExpense = () => {
+  const addExpense = async () => {
     if (!newExpense.title.trim() || !newExpense.amount) {
       showToast("Title and amount are required", "error");
       return;
     }
 
+    const tempId = `temp_${Date.now()}`;
     const expense = {
-      id: Date.now(),
       ...newExpense,
       amount: parseFloat(newExpense.amount),
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
-    setExpenses([expense, ...expenses]);
+    // Optimistic update
+    const optimisticExpense = { ...expense, id: tempId };
+    setExpenses([optimisticExpense, ...expenses]);
+
     setNewExpense({
       title: "",
       amount: "",
@@ -55,11 +63,19 @@ const ExpenseTracker = ({ theme, expenses, setExpenses, showToast }) => {
       date: new Date().toISOString().split("T")[0],
     });
     setShowAddExpense(false);
+    
+    // Add to sync queue (works offline and online)
+    syncQueue.add('expense', 'create', expense, tempId);
     showToast("Expense added successfully!");
   };
 
-  const deleteExpense = (id) => {
+  const deleteExpense = async (id) => {
     setExpenses(expenses.filter((e) => e.id !== id));
+    
+    if (authService.isAuthenticated()) {
+      syncQueue.add('expense', 'delete', { id }, id);
+    }
+    
     showToast("Expense deleted", "info");
   };
 
@@ -119,15 +135,14 @@ const ExpenseTracker = ({ theme, expenses, setExpenses, showToast }) => {
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-3xl font-bold">Expense Tracker 💰</h2>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">💰 Expense Tracker</h2>
         <button
           onClick={() => setShowAddExpense(!showAddExpense)}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95 flex items-center gap-2"
+          className="p-2 bg-blue-500 text-white rounded-full transition-all duration-200 hover:bg-blue-600 active:scale-95"
         >
-          <Plus size={20} />
-          {showAddExpense ? "Cancel" : "Add Expense"}
+          {showAddExpense ? <X size={20} /> : <Plus size={20} />}
         </button>
       </div>
 

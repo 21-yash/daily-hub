@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, FileText, Hash, Type } from 'lucide-react';
+import { Copy, FileText, Hash, Trash, Type } from 'lucide-react';
 
 const TextCounter = ({ theme, showToast }) => {
   const [text, setText] = useState('');
@@ -79,9 +79,9 @@ Reading Time: ${stats.readingTime} min
   ];
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-3xl font-bold">Text Counter & Analyzer 📝</h2>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">📝 Text Counter & Analyzer</h2>
         <div className="flex gap-2">
           <button
             onClick={copyStats}
@@ -96,7 +96,7 @@ Reading Time: ${stats.readingTime} min
             disabled={!text}
             className="px-4 py-2 bg-red-500 text-white rounded-lg transition-all duration-200 hover:bg-red-600 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Clear
+            <Trash size={20} />
           </button>
         </div>
       </div>

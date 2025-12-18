@@ -36,7 +36,7 @@ const NewsFeed = ({ theme, showToast }) => {
   const fetchNews = async () => {
     setLoading(true);
     try {
-      const API_KEY = import.meta.env.VITE_NEWS_KEY || '124267d595acf126a308d88c6aab4021'; 
+      const API_KEY = import.meta.env.VITE_NEWS_KEY; 
       
       const apiUrl = `https://gnews.io/api/v4/top-headlines?country=${country}&topic=${category}&lang=en&token=${API_KEY}`;
     
@@ -106,9 +106,9 @@ const NewsFeed = ({ theme, showToast }) => {
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-3xl font-bold">News Feed 📰</h2>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">📰 News Feed</h2>
         <button
           onClick={fetchNews}
           disabled={loading}

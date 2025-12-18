@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Clock, Globe } from "lucide-react";
+import { Plus, Trash2, Clock, Globe, X } from "lucide-react";
 
 const TimeZoneConverter = ({ theme, showToast }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -9,6 +9,9 @@ const TimeZoneConverter = ({ theme, showToast }) => {
     "Asia/Tokyo",
   ]);
   const [showAddZone, setShowAddZone] = useState(false);
+  const [convertTime, setConvertTime] = useState("");
+  const [convertDate, setConvertDate] = useState(new Date().toISOString().split("T")[0]);
+  const [sourceTimezone, setSourceTimezone] = useState("local");
 
   const cardBg = theme === "dark" ? "bg-gray-800" : "bg-white";
   const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200";
@@ -32,6 +35,7 @@ const TimeZoneConverter = ({ theme, showToast }) => {
     { value: "Europe/Moscow", label: "Moscow", offset: 3 },
     { value: "Asia/Dubai", label: "Dubai", offset: 4 },
     { value: "Asia/Karachi", label: "Karachi", offset: 5 },
+    { value: "Asia/Kolkata", label: "India (IST)", offset: 5.5 },
     { value: "Asia/Dhaka", label: "Dhaka", offset: 6 },
     { value: "Asia/Bangkok", label: "Bangkok", offset: 7 },
     { value: "Asia/Shanghai", label: "Beijing", offset: 8 },
@@ -119,15 +123,84 @@ const TimeZoneConverter = ({ theme, showToast }) => {
     return { status: "Morning", color: "text-blue-500" };
   };
 
+  // Convert time from source timezone to target timezone
+  const getConvertedTime = (targetTimezone) => {
+    if (!convertTime || !convertDate) return null;
+    
+    try {
+      const [hours, minutes] = convertTime.split(":");
+      
+      if (sourceTimezone === "local") {
+        // Converting from local time - straightforward
+        const inputDate = new Date(convertDate);
+        inputDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        
+        return inputDate.toLocaleString("en-US", {
+          timeZone: targetTimezone,
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        });
+      } else {
+        // Converting from a specific timezone to target timezone
+        // Step 1: Get the offset of the source timezone from UTC
+        const sourceOffsetHours = getTimezoneOffsetForDate(sourceTimezone, convertDate, convertTime);
+        
+        // Step 2: Create UTC time from the source time
+        // If source is UTC-8 (PT) and time is 17:00, UTC time is 17:00 + 8 = 01:00 next day
+        const [year, month, day] = convertDate.split("-").map(Number);
+        const utcMs = Date.UTC(year, month - 1, day, parseInt(hours), parseInt(minutes), 0) - (sourceOffsetHours * 60 * 60 * 1000);
+        const utcDate = new Date(utcMs);
+        
+        // Step 3: Format for target timezone
+        return utcDate.toLocaleString("en-US", {
+          timeZone: targetTimezone,
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        });
+      }
+    } catch (error) {
+      console.error("Conversion error:", error);
+      return "Invalid";
+    }
+  };
+
+  // Get timezone offset in hours for a specific date (handles DST)
+  const getTimezoneOffsetForDate = (timezone, dateStr, timeStr) => {
+    const [year, month, day] = dateStr.split("-").map(Number);
+    const [hours, minutes] = timeStr.split(":").map(Number);
+    
+    // Create a date in UTC
+    const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0));
+    
+    // Get the same moment in the target timezone
+    const tzString = utcDate.toLocaleString("en-US", { timeZone: timezone });
+    const tzDate = new Date(tzString);
+    
+    // The offset is how many hours ahead/behind the timezone is from UTC
+    // We need to reverse engineer this from the formatted time
+    const utcString = utcDate.toLocaleString("en-US", { timeZone: "UTC" });
+    const utcParsed = new Date(utcString);
+    
+    return (tzDate - utcParsed) / (1000 * 60 * 60);
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-3xl font-bold">Time Zone Converter 🌍</h2>
+        <h2 className="text-2xl font-bold">🌍 Time Zone Converter</h2>
         <button
           onClick={() => setShowAddZone(!showAddZone)}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95 flex items-center gap-2"
         >
-          <Plus size={20} />
+          {showAddZone ? <X size={20} /> : <Plus size={20} />}
           {showAddZone ? "Cancel" : "Add Zone"}
         </button>
       </div>
@@ -336,22 +409,67 @@ const TimeZoneConverter = ({ theme, showToast }) => {
           Convert a specific time across all your selected timezones:
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input
-            type="time"
-            className={`px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
-            onChange={(e) => {
-              // This would trigger conversion - implement as needed
-            }}
-          />
-          <input
-            type="date"
-            className={`px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
-            defaultValue={new Date().toISOString().split("T")[0]}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div>
+            <label className={`block text-sm ${textSecondary} mb-2`}>From Timezone</label>
+            <select
+              value={sourceTimezone}
+              onChange={(e) => setSourceTimezone(e.target.value)}
+              className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
+            >
+              <option value="local">🏠 Local Time</option>
+              {timeZones.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label} (UTC{tz.offset >= 0 ? "+" : ""}{tz.offset})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={`block text-sm ${textSecondary} mb-2`}>Time</label>
+            <input
+              type="time"
+              value={convertTime}
+              className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
+              onChange={(e) => setConvertTime(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className={`block text-sm ${textSecondary} mb-2`}>Date</label>
+            <input
+              type="date"
+              value={convertDate}
+              className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
+              onChange={(e) => setConvertDate(e.target.value)}
+            />
+          </div>
         </div>
+
+        {/* Converted Times */}
+        {convertTime && selectedZones.length > 0 && (
+          <div className="space-y-3">
+            <h4 className="font-semibold mb-3">Converted Times:</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {selectedZones.map((zone) => {
+                const zoneInfo = getZoneInfo(zone);
+                const converted = getConvertedTime(zone);
+                
+                return (
+                  <div
+                    key={zone}
+                    className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}
+                  >
+                    <div className="font-semibold text-blue-500">{zoneInfo.label}</div>
+                    <div className="text-lg font-bold">{converted}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 export default TimeZoneConverter;
+

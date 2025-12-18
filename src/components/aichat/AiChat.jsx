@@ -349,7 +349,7 @@ const AiChat = ({ theme }) => {
           value={userInput}
           onChange={(e) => setUserInput(e.target.value)}
           onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
-          placeholder="Type your message here... (Shift+Enter for new line)"
+          placeholder="Type your message here..."
           rows="1"
           className={`w-full p-4 pr-16 rounded-xl border ${inputBg} ${borderColor} resize-none focus:outline-none focus:ring-2 focus:ring-blue-500`}
         />

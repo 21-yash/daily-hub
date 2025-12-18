@@ -12,7 +12,7 @@ class EncryptionService {
   constructor() {
     // Base encryption key - CHANGE THIS to a random string
     // In production, store this in environment variables
-    this.baseKey = import.meta.env.VITE_ENCRYPTION_KEY || 'DailyHub-Default-Key-Change-Me-In-Production';
+    this.baseKey = import.meta.env.VITE_ENCRYPTION_KEY;
   }
 
   /**
@@ -39,7 +39,6 @@ class EncryptionService {
     try {
       const key = this.generateUserKey(userId);
       const encrypted = CryptoJS.AES.encrypt(text, key).toString();
-      console.log('🔒 Encrypted data');
       return encrypted;
     } catch (error) {
       console.error('❌ Encryption error:', error);

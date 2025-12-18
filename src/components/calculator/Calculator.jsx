@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Delete, RotateCcw, History, Sigma } from 'lucide-react';
+import { Delete, RotateCcw, History, Sigma, Calculator as CalculatorIcon } from 'lucide-react';
 
 const Calculator = ({ theme }) => {
   const [display, setDisplay] = useState('0');
@@ -152,10 +152,11 @@ const Calculator = ({ theme }) => {
 
   return (
     <div className="flex flex-col md:flex-row gap-6 items-start">
-       <h2 className="text-3xl font-bold flex items-center gap-2"> Calculator</h2>
+      <h2 className="text-2xl font-bold flex items-center gap-2">
+        <CalculatorIcon size={32} className="text-green-500" /> Calculator</h2>
       <div className={`p-6 rounded-2xl border ${cardBg} ${borderColor} shadow-2xl w-full max-w-sm`}>
         {/* Display */}
-        <div className={`mb-4 p-4 rounded-lg text-right overflow-hidden ${displayBg}`}>
+        <div className={`mb-4 p-2 rounded-lg text-right overflow-hidden ${displayBg}`}>
           <div className={`h-8 text-lg ${secondaryTextColor} break-all opacity-80`}>
             {operation && previousValue !== null && operation !== '=' ? `${previousValue} ${operation}` : ' '}
           </div>

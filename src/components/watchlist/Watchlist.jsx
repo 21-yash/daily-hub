@@ -10,16 +10,18 @@ import {
   Search,
   X,
 } from "lucide-react";
+import { watchlistService } from '../../services/api';
+import { authService } from '../../services/authService';
+import { syncQueue } from '../../services/syncQueue';
 
-// --- IMPORTANT: PASTE YOUR OMDb API KEY HERE ---
 const OMDB_API_KEY = "e7ac27b7";
-// Get your free key from https://www.omdbapi.com/apikey.aspx
 
-const Watchlist = ({ theme }) => {
+const Watchlist = ({ theme, showToast }) => {
   const [watchlist, setWatchlist] = useState([]);
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const [currentItem, setCurrentItem] = useState({
     title: "",
@@ -30,7 +32,7 @@ const Watchlist = ({ theme }) => {
     rating: 0,
     notes: "",
     genre: "",
-    posterUrl: "",
+    image: "",
   });
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,54 +42,80 @@ const Watchlist = ({ theme }) => {
 
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterType, setFilterType] = useState("all");
+  const [watchlistSearch, setWatchlistSearch] = useState("");
 
   const cardBg = theme === "dark" ? "bg-gray-800" : "bg-white";
   const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200";
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600";
 
-  // Load watchlist from localStorage on mount
+  // Load watchlist
   useEffect(() => {
-    const loadWatchlist = () => {
-      const saved = localStorage.getItem("watchlist");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          console.log('📥 Watchlist loaded from localStorage:', parsed.length, 'items');
-          setWatchlist(parsed);
-        } catch (e) {
-          console.error("Failed to load watchlist:", e);
-          setWatchlist([]);
+    const loadWatchlist = async () => {
+      
+      if (authService.isAuthenticated()) {
+        if (navigator.onLine) {
+          try {
+            const res = await watchlistService.getAll();
+            
+            // Map _id to id for consistency
+            const items = (res.data || []).map(item => {
+              return {
+                ...item,
+                id: item._id || item.id
+              };
+            });
+            
+            setWatchlist(items);
+          } catch (error) {
+            console.error("❌ [WATCHLIST] Failed to fetch watchlist", error);
+          }
         }
       } else {
-        console.log('📭 No watchlist in localStorage');
-        setWatchlist([]);
+        const saved = localStorage.getItem("watchlist");
+        console.log('💾 [WATCHLIST] Loading from localStorage:', saved);
+        
+        if (saved) {
+          try {
+            const items = JSON.parse(saved);
+            setWatchlist(items);
+          } catch (e) {
+            console.error("❌ [WATCHLIST] Failed to parse localStorage", e);
+          }
+        }
       }
       setIsInitialized(true);
     };
-
     loadWatchlist();
-
-    // Listen for storage events to reload data
-    const handleStorageChange = () => {
-      console.log('🔄 Storage event detected, reloading watchlist');
-      loadWatchlist();
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  // Save watchlist to localStorage when it changes
   useEffect(() => {
-    // Don't save during initial load
-    if (!isInitialized) return;
+    const handleSyncComplete = (e) => {
+      const { results } = e.detail;
+      
+      // Replace temp IDs with real MongoDB IDs
+      results.forEach(result => {
+        if (result.tempId && result.data?._id && result.type === 'watchlist') {
+          const realId = result.data._id;
+          
+          setWatchlist(prev => prev.map(item => {
+            if (item.id === result.tempId) {
+              const merged = {
+                ...item,           
+                ...result.data,    
+                id: realId,       
+                _id: realId      
+              };
+              return merged;
+            }
+            return item;
+          }));
+        }
+      });
+    };
     
-    console.log('💾 Saving watchlist to localStorage:', watchlist.length, 'items');
-    localStorage.setItem("watchlist", JSON.stringify(watchlist));
-    
-    // Trigger a custom event to notify App.jsx to sync
-    window.dispatchEvent(new CustomEvent('watchlistChange', { detail: watchlist }));
-  }, [watchlist, isInitialized]);
+    window.addEventListener('syncComplete', handleSyncComplete);
+    return () => window.removeEventListener('syncComplete', handleSyncComplete);
+  }, []);
 
   const searchOMDb = async () => {
     if (!searchQuery.trim()) return;
@@ -119,7 +147,8 @@ const Watchlist = ({ theme }) => {
     }
   };
 
-  const addItemFromOMDb = (omdbItem) => {
+  const addItemFromOMDb = async (omdbItem) => {
+  
     const typeMap = {
       series: "tv-show",
       movie: "movie",
@@ -127,44 +156,60 @@ const Watchlist = ({ theme }) => {
       episode: "tv-show",
     };
 
+    const tempId = `temp_${Date.now()}`;
     const newItem = {
-      id: omdbItem.imdbID, // Use IMDb ID for a stable unique key
       title: omdbItem.Title,
       type: typeMap[omdbItem.Type] || "other",
       year: omdbItem.Year,
-      posterUrl: omdbItem.Poster !== "N/A" ? omdbItem.Poster : "",
+      image: omdbItem.Poster !== "N/A" ? omdbItem.Poster : "",
+      imdbId: omdbItem.imdbID,
       status: "plan-to-watch",
       startDate: "",
       endDate: "",
       rating: 0,
       notes: "",
-      genre: "",
+      genre: omdbItem.Genre || "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    if (watchlist.some((item) => item.id === newItem.id)) {
-      alert(`${newItem.title} is already in your watchlist!`);
+    // Check for duplicates
+    if (watchlist.some((item) => item.imdbId === newItem.imdbId)) {
+        showToast(`${newItem.title} is already in your watchlist!`, 'warning');
       return;
     }
 
-    console.log('➕ Adding item to watchlist:', newItem.title);
-    setWatchlist([newItem, ...watchlist]);
+    const optimisticItem = { ...newItem, id: tempId };
+    
+    setWatchlist([optimisticItem, ...watchlist]);
     resetForm();
+
+    if (authService.isAuthenticated()) {
+      syncQueue.add('watchlist', 'create', newItem, tempId);
+    } else {
+      console.log('⚠️ [WATCHLIST] Not authenticated, skipping sync');
+    }
   };
 
-  const addOrUpdateItem = () => {
+  const addOrUpdateItem = async () => {
     if (!currentItem.title.trim()) return;
 
     if (editingItem) {
-      console.log('✏️ Updating item:', currentItem.title);
+      const updatedItem = { 
+        ...editingItem, 
+        ...currentItem, 
+        updatedAt: new Date().toISOString() 
+      };
+      
       setWatchlist(
         watchlist.map((item) =>
-          item.id === editingItem.id
-            ? { ...item, ...currentItem, updatedAt: new Date().toISOString() }
-            : item,
+          item.id === editingItem.id ? updatedItem : item,
         ),
       );
+      
+      if (authService.isAuthenticated()) {
+        syncQueue.add('watchlist', 'update', updatedItem, editingItem.id);
+      }
     }
 
     resetForm();
@@ -180,9 +225,10 @@ const Watchlist = ({ theme }) => {
       rating: 0,
       notes: "",
       genre: "",
-      posterUrl: "",
+      image: "",
     });
     setShowAddItem(false);
+    setShowEditModal(false);
     setEditingItem(null);
     setSearchQuery("");
     setSearchResults([]);
@@ -197,50 +243,67 @@ const Watchlist = ({ theme }) => {
         status: "plan-to-watch",
         startDate: "",
         endDate: "",
-        rating: 0,
+        rating: 0.0,
         notes: "",
         genre: "",
-        posterUrl: "",
+        image: "",
       },
       ...item,
     };
     setCurrentItem(itemToEdit);
     setEditingItem(item);
-    setShowAddItem(true);
+    setShowEditModal(true); // Show modal instead of inline form
   };
 
-  const deleteItem = (id) => {
-    console.log('🗑️ Deleting item:', id);
+  const deleteItem = async (id) => {
     setWatchlist(watchlist.filter((item) => item.id !== id));
+    
+    if (authService.isAuthenticated() && !id.startsWith('temp_')) {
+      syncQueue.add('watchlist', 'delete', { id }, id);
+    }
   };
 
-  const updateStatus = (id, newStatus) => {
-    console.log('🔄 Updating status for:', id, 'to', newStatus);
+  const updateStatus = async (id, newStatus) => {
+    const item = watchlist.find(i => i.id === id);
+    if (!item) return;
+
+    const updates = {
+      status: newStatus,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    if (newStatus === "watching" && !item.startDate) {
+      updates.startDate = new Date().toISOString().split("T")[0];
+    }
+    if (newStatus === "completed" && !item.endDate) {
+      updates.endDate = new Date().toISOString().split("T")[0];
+    }
+    
+    const updatedItem = { ...item, ...updates };
+    
     setWatchlist(
       watchlist.map((item) => {
         if (item.id === id) {
-          const updates = {
-            status: newStatus,
-            updatedAt: new Date().toISOString(),
-          };
-          if (newStatus === "watching" && !item.startDate) {
-            updates.startDate = new Date().toISOString().split("T")[0];
-          }
-          if (newStatus === "completed" && !item.endDate) {
-            updates.endDate = new Date().toISOString().split("T")[0];
-          }
-          return { ...item, ...updates };
+          return updatedItem;
         }
         return item;
       }),
     );
+    
+    if (authService.isAuthenticated()) {
+      syncQueue.add('watchlist', 'update', updatedItem, id);
+    }
   };
 
   const filteredItems = watchlist.filter((item) => {
     const matchesStatus =
       filterStatus === "all" || item.status === filterStatus;
     const matchesType = filterType === "all" || item.type === filterType;
-    return matchesStatus && matchesType;
+    const matchesSearch = 
+      watchlistSearch === "" || 
+      item.title.toLowerCase().includes(watchlistSearch.toLowerCase()) ||
+      (item.genre && item.genre.toLowerCase().includes(watchlistSearch.toLowerCase()));
+    return matchesStatus && matchesType && matchesSearch;
   });
 
   const getStatusIcon = (status) => {
@@ -270,9 +333,9 @@ const Watchlist = ({ theme }) => {
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-3xl font-bold flex items-center gap-2">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold flex items-center gap-2">
           🎬 Watchlist <span className="text-sm text-gray-500">({watchlist.length} items)</span>
         </h2>
         <button
@@ -280,21 +343,89 @@ const Watchlist = ({ theme }) => {
             setShowAddItem(!showAddItem);
             if (showAddItem) resetForm();
           }}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 flex items-center gap-2"
+          className="p-2 bg-blue-500 text-white rounded-full transition-all duration-200 hover:bg-blue-600 active:scale-95"
         >
           {showAddItem ? <X size={20} /> : <Plus size={20} />}
-          {showAddItem ? "Cancel" : "Add Item"}
         </button>
       </div>
 
       {showAddItem && (
         <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-6`}>
-          {editingItem ? (
-            // --- EDIT FORM ---
-            <>
-              <h3 className="text-xl font-semibold mb-4">
+          {/* Only show OMDb search, edit is now in modal */}
+          <h3 className="text-xl font-semibold mb-4">
+            Search OMDb for a Movie or TV Show
+          </h3>
+          <div className="flex gap-2 mb-4">
+            <input
+              type="text"
+              placeholder="e.g., Game of Thrones..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && searchOMDb()}
+              className={`flex-1 px-4 py-2 rounded-lg ${cardBg} border ${borderColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+            />
+            <button
+              onClick={searchOMDb}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
+            >
+              <Search size={18} />
+            </button>
+          </div>
+
+          {isLoading && <p className={textSecondary}>Searching...</p>}
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+
+          <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto">
+            {searchResults.map((result) => (
+              <div
+                key={result.imdbID}
+                onClick={() => addItemFromOMDb(result)}
+                className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"} p-2 rounded-lg flex items-center gap-4 cursor-pointer hover:bg-blue-500/20`}
+              >
+                <img
+                  src={
+                    result.Poster !== "N/A"
+                      ? result.Poster
+                      : "https://placehold.co/50x75/0f172a/FFF?text=?"
+                  }
+                  alt={result.Title}
+                  className="w-12 h-[72px] object-cover rounded"
+                />
+                <div className="flex-1">
+                  <p className="font-semibold">{result.Title}</p>
+                  <p className={`${textSecondary} text-sm capitalize`}>
+                    {result.Type} ({result.Year})
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* --- EDIT MODAL --- */}
+      {showEditModal && editingItem && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div 
+            className={`${cardBg} rounded-2xl border ${borderColor} w-full max-w-2xl max-h-[90vh] overflow-y-auto`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-inherit p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <h3 className="text-xl font-semibold">
                 Edit "{editingItem.title}"
               </h3>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  resetForm();
+                }}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <input
                   type="text"
@@ -374,19 +505,22 @@ const Watchlist = ({ theme }) => {
                   <label className={`block text-sm ${textSecondary} mb-1`}>
                     Rating: {currentItem.rating}/10
                   </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="10"
-                    value={currentItem.rating}
-                    onChange={(e) =>
-                      setCurrentItem({
-                        ...currentItem,
-                        rating: parseInt(e.target.value),
-                      })
-                    }
-                    className="w-full"
-                  />
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="range"
+                      min="0"
+                      max="10"
+                      step="0.1"
+                      value={currentItem.rating}
+                      onChange={(e) =>
+                        setCurrentItem({
+                          ...currentItem,
+                          rating: parseFloat(e.target.value),
+                        })
+                      }
+                      className="flex-1"
+                    />
+                  </div>
                 </div>
                 <textarea
                   placeholder="Notes"
@@ -398,79 +532,40 @@ const Watchlist = ({ theme }) => {
                   className={`md:col-span-2 px-4 py-2 rounded-lg ${cardBg} border ${borderColor}`}
                 />
               </div>
-              <div className="flex gap-2 mt-4">
+              <div className="flex gap-2 mt-6">
                 <button
-                  onClick={addOrUpdateItem}
-                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                  onClick={() => {
+                    addOrUpdateItem();
+                    setShowEditModal(false);
+                  }}
+                  className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium"
                 >
                   Update Item
                 </button>
                 <button
-                  onClick={resetForm}
-                  className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    resetForm();
+                  }}
+                  className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-medium"
                 >
                   Cancel
                 </button>
               </div>
-            </>
-          ) : (
-            // --- OMDb SEARCH INTERFACE ---
-            <>
-              <h3 className="text-xl font-semibold mb-4">
-                Search OMDb for a Movie or TV Show
-              </h3>
-              <div className="flex gap-2 mb-4">
-                <input
-                  type="text"
-                  placeholder="e.g., Inception, The Office..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && searchOMDb()}
-                  className={`flex-1 px-4 py-2 rounded-lg ${cardBg} border ${borderColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                />
-                <button
-                  onClick={searchOMDb}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
-                >
-                  <Search size={18} /> Search
-                </button>
-              </div>
-
-              {isLoading && <p className={textSecondary}>Searching...</p>}
-              {error && <p className="text-red-500 text-sm">{error}</p>}
-
-              <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto">
-                {searchResults.map((result) => (
-                  <div
-                    key={result.imdbID}
-                    onClick={() => addItemFromOMDb(result)}
-                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"} p-2 rounded-lg flex items-center gap-4 cursor-pointer hover:bg-blue-500/20`}
-                  >
-                    <img
-                      src={
-                        result.Poster !== "N/A"
-                          ? result.Poster
-                          : "https://placehold.co/50x75/0f172a/FFF?text=?"
-                      }
-                      alt={result.Title}
-                      className="w-12 h-[72px] object-cover rounded"
-                    />
-                    <div className="flex-1">
-                      <p className="font-semibold">{result.Title}</p>
-                      <p className={`${textSecondary} text-sm capitalize`}>
-                        {result.Type} ({result.Year})
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* --- FILTER AND DISPLAY LOGIC --- */}
+      {/* --- SEARCH AND FILTER --- */}
       <div className="flex gap-2 mb-6 flex-wrap">
+        <input
+          type="text"
+          placeholder="Search watchlist..."
+          value={watchlistSearch}
+          onChange={(e) => setWatchlistSearch(e.target.value)}
+          className={`flex-1 px-4 py-2 rounded-lg ${cardBg} border ${borderColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+        />
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
@@ -504,8 +599,8 @@ const Watchlist = ({ theme }) => {
             <div className="flex items-start gap-4 mb-3">
               <img
                 src={
-                  item.posterUrl
-                    ? item.posterUrl
+                  item.image
+                    ? item.image
                     : "https://placehold.co/100x150/0f172a/FFF?text=?"
                 }
                 alt={item.title}
@@ -550,7 +645,7 @@ const Watchlist = ({ theme }) => {
                     {" "}
                     <span className="text-yellow-500">⭐</span>{" "}
                     <span className={textSecondary}>
-                      Rating: {item.rating}/10
+                      Rating: {item.rating.toFixed(1)}/10
                     </span>{" "}
                   </div>
                 )}

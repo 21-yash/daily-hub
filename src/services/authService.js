@@ -58,6 +58,29 @@ export const authService = {
     return response.json();
   },
 
+  async updateSettings(settings) {
+    const token = localStorage.getItem('authToken');
+    const response = await fetch(`${API_URL}/user/settings`, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(settings)
+    });
+    return response.json();
+  },
+
+  async getSettings() {
+    const token = localStorage.getItem('authToken');
+    const response = await fetch(`${API_URL}/user/settings`, {
+      headers: { 
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    return response.json();
+  },
+
   logout() {
     localStorage.removeItem('authToken');
     localStorage.removeItem('userId');

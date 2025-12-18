@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, CheckSquare, Key, StickyNote, Link2, Calculator as CalculatorIcon, Gauge, Moon, Sun, Menu, X, Search, Home, Settings, Download, Upload, Trash2, Eye, EyeOff, Copy, Lock, Bot, Clapperboard, Gamepad2, Cake, LogIn, LogOut, User, Newspaper, Goal, HandCoins, ScanText, CalendarClock, Music, FileText } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, CheckSquare, Key, StickyNote, Link2, Calculator as CalculatorIcon, Gauge, Moon, Sun, Menu, X, Search, Home, Settings, Download, Upload, Trash2, Eye, EyeOff, Copy, Lock, Bot, Clapperboard, Gamepad2, Cake, LogIn, LogOut, User, Newspaper, Goal, HandCoins, ScanText, CalendarClock, Music, FileText, ChevronRight, Filter, Calendar, Clock, Droplet, TextSearch, CalendarSearch } from 'lucide-react';
 import QuickLinks from './components/links/QuickLinks';
 import Calculator from './components/calculator/Calculator';
 import Watchlist from './components/watchlist/Watchlist';
 import { getSpecialDaysForDate, getUpcomingHolidays } from './utils/indianHolidays';
-import AiChat from './components/aichat/AiChat';
 import AuthModal from './components/auth/AuthModal';
 import { authService } from './services/authService';
 import { getOnThisDay } from './utils/onThisDay';
@@ -14,33 +13,51 @@ import NumberGuessing from './components/games/NumberGuessing';
 import ReactionTime from './components/games/ReactionTime';
 import { encryptionService } from './utils/encryption';
 import { greetingService } from './utils/greetings';
+import DynamicCalendarIcon from './utils/calendarIcon.jsx';
 import TicTacToe from './components/games/TicTacToe';
 import WordGuess from './components/games/WordGuess';
 import TypingTest from './components/games/TypingTest';
 import WhacAMole from './components/games/WhacAMole';
 import SimonSays from './components/games/SimonSays';
 import ConnectFour from './components/games/ConnectFour';
+import Chess from './components/games/Chess';
 import HabitTracker from './components/habits/HabitTracker';
 import ExpenseTracker from './components/expenses/ExpenseTracker';
 import TextCounter from './components/tools/TextCounter';
 import NewsFeed from './components/news/NewsFeed';
 import TimeZoneConverter from './components/tools/TimeZoneConverter';
 import CricketScoreboard from './components/cricket/CricketScoreboard';
-import MusicPlayer from './components/music/MusicPlayer';
 import PdfTools from './components/tools/PdfTools';
+import FindReplace from './components/tools/FindReplace';
+import AgeCalculator from './components/tools/AgeCalculator';
+import cricketIcon from './assets/icons/cricketIcon.svg?react';
+import { 
+  todoService, 
+  noteService, 
+  passwordService, 
+  birthdayService, 
+  linkService, 
+  expenseService, 
+  habitService, 
+  migrationService
+} from './services/api';
+import { syncQueue } from './services/syncQueue';
 
 const DailyHub = () => {
-  const [isLoading, setIsLoading] = useState(true);
   const [theme, setTheme] = useState('light');
   const [activeView, setActiveView] = useState('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showDrawer, setShowDrawer] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [syncTimeout, setSyncTimeout] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showFABMenu, setShowFABMenu] = useState(false);
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Todo state a
+  // Todo state
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState('');
   const [todoFilter, setTodoFilter] = useState('all');
@@ -59,6 +76,7 @@ const DailyHub = () => {
   const [includeNumbers, setIncludeNumbers] = useState(true);
   const [includeSymbols, setIncludeSymbols] = useState(true);
   const [showAddPassword, setShowAddPassword] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [newPasswordEntry, setNewPasswordEntry] = useState({
     title: '',
     username: '',
@@ -96,6 +114,9 @@ const DailyHub = () => {
   const [city, setCity] = useState('Nashik');
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [greetingData, setGreetingData] = useState(null);
+  const [showWeatherDetail, setShowWeatherDetail] = useState(false);
+  const [showCountdown, setShowCountdown] = useState(false);
+  const [showWeekOfMonth, setShowWeekOfMonth] = useState(false);
 
   // Birthday state
   const [birthdays, setBirthdays] = useState([]);
@@ -130,309 +151,452 @@ const DailyHub = () => {
   // Expenses state
   const [expenses, setExpenses] = useState([]);
 
-  // Load data from memory on mount
+  // Game states
+  const [ticTacToeBoard, setTicTacToeBoard] = useState(Array(9).fill(null));
+  const [currentPlayer, setCurrentPlayer] = useState('X');
+  const [ticTacToeWinner, setTicTacToeWinner] = useState(null);
+  const [wordGuessSolution, setWordGuessSolution] = useState('');
+  const [wordGuesses, setWordGuesses] = useState([]);
+  const [currentGuess, setCurrentGuess] = useState('');
+  const [wordGuessStatus, setWordGuessStatus] = useState('playing');
+  const [typingText] = useState("The quick brown fox jumps over the lazy dog. This sentence contains every letter of the alphabet. Practice makes perfect.");
+  const [userInput, setUserInput] = useState('');
+  const [typingStatus, setTypingStatus] = useState('waiting');
+  const [startTime, setStartTime] = useState(null);
+  const [wpm, setWpm] = useState(0);
+  const [accuracy, setAccuracy] = useState(0);
+  const [moles, setMoles] = useState(Array(9).fill(false));
+  const [whacScore, setWhacScore] = useState(0);
+  const [whacTimeLeft, setWhacTimeLeft] = useState(0);
+  const [isWhacActive, setIsWhacActive] = useState(false);
+  const [simonSequence, setSimonSequence] = useState([]);
+  const [playerSequence, setPlayerSequence] = useState([]);
+  const [isPlayerTurn, setIsPlayerTurn] = useState(false);
+  const [simonStatus, setSimonStatus] = useState('waiting');
+  const [litButton, setLitButton] = useState(null);
+  const [connectFourBoard, setConnectFourBoard] = useState(Array(6).fill(Array(7).fill(null)));
+  const [cfCurrentPlayer, setCfCurrentPlayer] = useState('player');
+  const [connectFourWinner, setConnectFourWinner] = useState(null);
+
+  const FIVE_LETTER_WORDS = ['REACT', 'HELLO', 'WORLD', 'GAMES', 'THEME', 'STYLE', 'QUERY'];
+
+  const viewHistoryRef = useRef(['dashboard']);
+  const lastBackPress = useRef(0);
+  
+  // Track view changes
   useEffect(() => {
-    const checkAuth = async () => {
-      setIsLoading(true);
-      if (authService.isAuthenticated()) {
-        setIsAuthenticated(true);
-        try {
-          const userId = localStorage.getItem('userId');
-          const userInfo = await authService.getUserInfo();
-          setCurrentUser(userInfo);
-          
-          const userData = await authService.getData();
-          console.log('📥 Loaded data from server:', userData);
+    if (activeView && viewHistoryRef.current[viewHistoryRef.current.length - 1] !== activeView) {
+      viewHistoryRef.current.push(activeView);
+    }
+  }, [activeView]);
 
-          // Decrypt passwords first if they exist
-          let decryptedPasswords = [];
-          if (userData.passwords && Array.isArray(userData.passwords) && userData.passwords.length > 0) {
-            try {
-              decryptedPasswords = encryptionService.decryptPasswordArray(userData.passwords, userId);
-              console.log('✅ Decrypted passwords:', decryptedPasswords.length);
-            } catch (error) {
-              console.error('❌ Failed to decrypt passwords:', error);
-            }
-          }
-
-          // Decrypt master password if it exists
-          if (userData.masterPassword) {
-            try {
-              const decryptedMasterPass = encryptionService.decryptMasterPassword(userData.masterPassword, userId);
-              localStorage.setItem('masterPassword', decryptedMasterPass);
-              setMasterPasswordSet(true);
-              console.log('✅ Master password decrypted');
-            } catch (error) {
-              console.error('❌ Failed to decrypt master password:', error);
-            }
-          }
-
-          // Decrypt recovery data if it exists
-          if (userData.recoveryData) {
-            try {
-              const decryptedRecovery = encryptionService.decryptRecoveryData(userData.recoveryData, userId);
-              localStorage.setItem('recoveryData', JSON.stringify(decryptedRecovery));
-              setRecoveryQuestion(decryptedRecovery.question);
-              setRecoveryAnswer(decryptedRecovery.answer);
-              console.log('✅ Recovery data decrypted');
-            } catch (error) {
-              console.error('❌ Failed to decrypt recovery data:', error);
-            }
-          }
-          
-          // Set todos - ALWAYS set state, even if empty array
-          const loadedTodos = userData.todos || [];
-          setTodos(loadedTodos);
-          localStorage.setItem('todos', JSON.stringify(loadedTodos));
-          console.log('✅ Loaded todos:', loadedTodos.length);
-
-          // Set passwords - ALWAYS set state, even if empty
-          setPasswords(decryptedPasswords);
-          localStorage.setItem('passwords', JSON.stringify(decryptedPasswords));
-          console.log('✅ Loaded passwords:', decryptedPasswords.length);
-
-          // Set notes - ALWAYS set state
-          const loadedNotes = userData.notes || [];
-          setNotes(loadedNotes);
-          localStorage.setItem('notes', JSON.stringify(loadedNotes));
-          console.log('✅ Loaded notes:', loadedNotes.length);
-
-          // Set birthdays - ALWAYS set state
-          const loadedBirthdays = userData.birthdays || [];
-          setBirthdays(loadedBirthdays);
-          localStorage.setItem('birthdays', JSON.stringify(loadedBirthdays));
-          console.log('✅ Loaded birthdays:', loadedBirthdays.length);
-
-          // Set links - ALWAYS set state
-          const loadedLinks = userData.links || [];
-          setLinks(loadedLinks);
-          localStorage.setItem('links', JSON.stringify(loadedLinks));
-          console.log('✅ Loaded links:', loadedLinks.length);
-
-          // Set habits - ALWAYS set state
-          const loadedHabits = userData.habits || [];
-          setHabits(loadedHabits);
-          localStorage.setItem('habits', JSON.stringify(loadedHabits));
-          console.log('✅ Loaded habits:', loadedHabits.length);
-
-          // Set expenses - ALWAYS set state
-          const loadedExpenses = userData.expenses || [];
-          setExpenses(loadedExpenses);
-          localStorage.setItem('expenses', JSON.stringify(loadedExpenses));
-          console.log('✅ Loaded expenses:', loadedExpenses.length);
-
-          // Set watchlist
-          const loadedWatchlist = userData.watchlist || [];
-          localStorage.setItem('watchlist', JSON.stringify(loadedWatchlist));
-          console.log('✅ Loaded watchlist:', loadedWatchlist.length);
-
-          // Set theme
-          if (userData.theme) {
-            setTheme(userData.theme);
-            localStorage.setItem('theme', userData.theme);
-            console.log('✅ Loaded theme:', userData.theme);
-          }
-
-          // Set AI chat history
-          const loadedAiChat = userData.aiChatHistory || [];
-          localStorage.setItem('geminiChatHistory', JSON.stringify(loadedAiChat));
-          console.log('✅ Loaded AI chat history:', loadedAiChat.length);
-          
-          console.log('✅ All data decrypted and loaded successfully');
-        } catch (error) {
-          console.error('❌ Failed to load user data:', error);
-          showToast('Failed to load data. Please try logging in again.', 'error');
-        }
-      } else {
-        // Not authenticated - load from localStorage
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        const savedTodos = localStorage.getItem('todos');
-        const savedMasterPassword = localStorage.getItem('masterPassword');
-        const savedPasswords = localStorage.getItem('passwords');
-        const savedRecovery = localStorage.getItem('recoveryData');
-        const savedAutoLock = localStorage.getItem('autoLockTimeout');
-        const savedNotes = localStorage.getItem('notes');
-        const savedBirthdays = localStorage.getItem('birthdays');
-        const savedLinks = localStorage.getItem('links');
-        const savedHabits = localStorage.getItem('habits');
-        const savedExpenses = localStorage.getItem('expenses');
-        
-        setTheme(savedTheme);
-        if (savedTodos) setTodos(JSON.parse(savedTodos));
-        if (savedMasterPassword) setMasterPasswordSet(true);
-        if (savedPasswords) setPasswords(JSON.parse(savedPasswords));
-        if (savedRecovery) {
-          const recovery = JSON.parse(savedRecovery);
-          setRecoveryQuestion(recovery.question);
-          setRecoveryAnswer(recovery.answer);
-        }
-        if (savedAutoLock) setAutoLockTimeout(parseInt(savedAutoLock));
-        if (savedNotes) setNotes(JSON.parse(savedNotes));
-        if (savedBirthdays) setBirthdays(JSON.parse(savedBirthdays));
-        if (savedLinks) setLinks(JSON.parse(savedLinks));
-        if (savedHabits) setHabits(JSON.parse(savedHabits));
-        if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
-        
-        console.log('✅ Loaded data from localStorage (not authenticated)');
-      }
-      setIsLoading(false);
-    };
-    checkAuth();
-  }, []);
-
-  // Debounced sync function
-  const syncToServer = async () => {
-    if (!isAuthenticated) return;
-    
+  // Safely parse JSON with fallback
+  const safeJSONParse = (data, fallback = null) => {
     try {
-      const userId = localStorage.getItem('userId');
-      const watchlistData = localStorage.getItem('watchlist');
-      const masterPass = localStorage.getItem('masterPassword');
-      const recovery = localStorage.getItem('recoveryData');
-      const aiChat = localStorage.getItem('geminiChatHistory');
-      
-      // Encrypt sensitive data before syncing
-      const encryptedMasterPass = masterPass 
-        ? encryptionService.encryptMasterPassword(masterPass, userId)
-        : null;
-      
-      const encryptedRecovery = recovery 
-        ? encryptionService.encryptRecoveryData(JSON.parse(recovery), userId)
-        : null;
-      
-      // Encrypt all password entries
-      const encryptedPasswords = encryptionService.encryptPasswordArray(passwords, userId);
-      
-      const dataToSync = {
-        todos: todos || [],
-        passwords: encryptedPasswords, // Now encrypted!
-        notes: notes || [],
-        birthdays: birthdays || [],
-        links: links || [],
-        habits: habits || [],
-        expenses: expenses || [],
-        watchlist: watchlistData ? JSON.parse(watchlistData) : [],
-        theme: theme || 'light',
-        masterPassword: encryptedMasterPass, // Encrypted!
-        recoveryData: encryptedRecovery, // Encrypted!
-        aiChatHistory: aiChat ? JSON.parse(aiChat) : []
-      };
-      
-      const response = await authService.syncData(dataToSync);
-      console.log('✅ Data synced successfully:', response);
+      return JSON.parse(data);
     } catch (error) {
-      console.error('❌ Failed to sync data:', error);
-      showToast('Failed to sync data to server', 'error');
+      console.error('JSON parse error:', error);
+      return fallback;
     }
   };
 
-  // Initialize greeting data once on mount
+  // Batch update localStorage
+  const batchUpdateLocalStorage = (updates) => {
+    Object.entries(updates).forEach(([key, value]) => {
+      try {
+        const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+        localStorage.setItem(key, stringValue);
+      } catch (error) {
+        console.error(`Failed to save ${key} to localStorage:`, error);
+      }
+    });
+  };
+
+  // Clear specific data
+  const clearUserData = (keepTheme = true) => {
+    const keysToKeep = keepTheme ? ['theme'] : [];
+    const allKeys = Object.keys(localStorage);
+    
+    allKeys.forEach(key => {
+      if (!keysToKeep.includes(key)) {
+        localStorage.removeItem(key);
+      }
+    });
+  };
+
+  const withErrorHandling = async (operation, errorMessage) => {
+    try {
+      return await operation();
+    } catch (error) {
+      console.error(errorMessage, error);
+      showToast(errorMessage, 'error');
+      return null;
+    }
+  };
+
+  const loadLocalData = () => {
+    console.log('📂 Loading data from localStorage...');
+    const localTodos = safeJSONParse(localStorage.getItem('todos'), []);
+    const localNotes = safeJSONParse(localStorage.getItem('notes'), []);
+    const localPasswords = safeJSONParse(localStorage.getItem('passwords'), []);
+    const localBirthdays = safeJSONParse(localStorage.getItem('birthdays'), []);
+    const localLinks = safeJSONParse(localStorage.getItem('links'), []);
+    const localHabits = safeJSONParse(localStorage.getItem('habits'), []);
+    const localExpenses = safeJSONParse(localStorage.getItem('expenses'), []);
+    const localTheme = localStorage.getItem('theme') || 'light';
+    
+    setTodos(localTodos || []);
+    setNotes(localNotes || []);
+    setPasswords(localPasswords || []);
+    setBirthdays(localBirthdays || []);
+    setLinks(localLinks || []);
+    setHabits(localHabits || []);
+    setExpenses(localExpenses || []);
+    setTheme(localTheme);
+    
+    // Check for master password
+    const savedMasterPass = localStorage.getItem('masterPassword');
+    if (savedMasterPass) {
+      setMasterPassword(savedMasterPass);
+      setMasterPasswordSet(true);
+    }
+    
+    const savedRecovery = safeJSONParse(localStorage.getItem('recoveryData'));
+    if (savedRecovery) {
+      setRecoveryQuestion(savedRecovery.question);
+      setRecoveryAnswer(savedRecovery.answer);
+    }
+  };
+
+  // Load data from API on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      setIsLoading(true);
+      
+      try {
+        const isAuth = authService.isAuthenticated();
+        
+        if (isAuth) {
+          setIsAuthenticated(true);
+          
+          // Load user info
+          const userInfo = await authService.getUserInfo();
+          setCurrentUser(userInfo);
+          const userId = localStorage.getItem('userId');
+          
+          // Load all data in parallel
+          try {
+            const [
+              todosRes, 
+              notesRes, 
+              passwordsRes, 
+              birthdaysRes, 
+              linksRes, 
+              expensesRes, 
+              habitsRes
+            ] = await Promise.all([
+              todoService.getAll(),
+              noteService.getAll(),
+              passwordService.getAll(),
+              birthdayService.getAll(),
+              linkService.getAll(),
+              expenseService.getAll(),
+              habitService.getAll()
+            ]);
+
+            // Decrypt passwords
+            let decryptedPasswords = [];
+            if (passwordsRes.data && passwordsRes.data.length > 0) {
+                try {
+                    decryptedPasswords = encryptionService.decryptPasswordArray(passwordsRes.data, userId);
+                } catch (e) {
+                    console.error("Failed to decrypt passwords", e);
+                }
+            }
+
+            setTodos((todosRes.data || []).map(t => ({ ...t, id: t._id || t.id })));
+            setNotes((notesRes.data || []).map(n => ({ ...n, id: n._id || n.id })));
+            setPasswords(decryptedPasswords.map(p => ({ ...p, id: p._id || p.id })));
+            setBirthdays((birthdaysRes.data || []).map(b => ({ ...b, id: b._id || b.id })));
+            setLinks((linksRes.data || []).map(l => ({ ...l, id: l._id || l.id })));
+            setExpenses((expensesRes.data || []).map(e => ({ ...e, id: e._id || e.id })));
+            setHabits((habitsRes.data || []).map(h => ({ ...h, id: h._id || h.id })));
+
+            try {
+              const settingsRes = await authService.getSettings();
+              
+              if (settingsRes.masterPassword) {
+                try {
+                  // Decrypt master password
+                  const decryptedMasterPass = encryptionService.decrypt(settingsRes.masterPassword, userId);
+                  setMasterPassword(decryptedMasterPass);
+                  setMasterPasswordSet(true);
+                  localStorage.setItem('masterPassword', decryptedMasterPass);
+                  console.log('✅ Master password loaded from server');
+                } catch (decryptErr) {
+                  console.error('Failed to decrypt master password:', decryptErr);
+                }
+              }
+              
+              if (settingsRes.recoveryData) {
+                try {
+                  const recoveryData = settingsRes.recoveryData;
+                  
+                  if (recoveryData.question) {
+                    setRecoveryQuestion(recoveryData.question); // Question is plain text
+                  }
+                  
+                  if (recoveryData.answer) {
+                    const decryptedAnswer = encryptionService.decrypt(recoveryData.answer, userId);
+                    setRecoveryAnswer(decryptedAnswer);
+                  }
+                  
+                  localStorage.setItem('recoveryData', JSON.stringify({
+                    question: recoveryData.question,
+                    answer: recoveryData.answer ? encryptionService.decrypt(recoveryData.answer, userId) : ''
+                  }));
+                  
+                  console.log('✅ Recovery data loaded from server');
+                } catch (decryptErr) {
+                  console.error('Failed to decrypt recovery data:', decryptErr);
+                }
+              }
+              
+              if (settingsRes.theme) {
+                setTheme(settingsRes.theme);
+              }
+            } catch (settingsError) {
+              console.warn('Could not load settings from server:', settingsError);
+            }
+            
+            console.log('✅ All granular data loaded successfully');
+
+          } catch (err) {
+            console.error('Partial load failure or network error:', err);
+            // If network error, maybe load from localStorage?
+            // For now, we fall back to loadLocalData() if everything fails
+            if (!navigator.onLine) {
+                 loadLocalData();
+            }
+          }
+          
+        } else {
+          // Not authenticated - load from localStorage
+          setIsAuthenticated(false);
+          loadLocalData();
+        }
+      } catch (error) {
+        console.error('❌ Failed to load user data:', error);
+        showToast('Failed to load data. Please try logging in again.', 'error');
+        loadLocalData();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  const refreshData = async () => {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      console.warn('❌ No auth token, skipping refresh');
+      return;
+    }
+    console.log('🔄 Refreshing data from server...');
+    try {
+        const [
+            todosRes, 
+            notesRes, 
+            passwordsRes, 
+            birthdaysRes, 
+            linksRes, 
+            expensesRes, 
+            habitsRes
+        ] = await Promise.all([
+            todoService.getAll(),
+            noteService.getAll(),
+            passwordService.getAll(),
+            birthdayService.getAll(),
+            linkService.getAll(),
+            expenseService.getAll(),
+            habitService.getAll()
+        ]);
+
+        const userId = localStorage.getItem('userId');
+        let decryptedPasswords = [];
+        if (passwordsRes.data && passwordsRes.data.length > 0) {
+            try {
+                decryptedPasswords = encryptionService.decryptPasswordArray(passwordsRes.data, userId);
+            } catch (e) { console.error(e); }
+        }
+
+        setTodos((todosRes.data || []).map(t => ({ ...t, id: t._id || t.id })));
+        setNotes((notesRes.data || []).map(n => ({ ...n, id: n._id || n.id })));
+        setPasswords(decryptedPasswords.map(p => ({ ...p, id: p._id || p.id })));
+        setBirthdays((birthdaysRes.data || []).map(b => ({ ...b, id: b._id || b.id })));
+        setLinks((linksRes.data || []).map(l => ({ ...l, id: l._id || l.id })));
+        setExpenses((expensesRes.data || []).map(e => ({ ...e, id: e._id || e.id })));
+        setHabits((habitsRes.data || []).map(h => ({ ...h, id: h._id || h.id })));
+
+        try {
+          const settingsRes = await authService.getSettings();
+              
+          if (settingsRes.masterPassword) {
+            try {
+              // Decrypt master password
+              const decryptedMasterPass = encryptionService.decrypt(settingsRes.masterPassword, userId);
+              setMasterPassword(decryptedMasterPass);
+              setMasterPasswordSet(true);
+              localStorage.setItem('masterPassword', decryptedMasterPass);
+              console.log('✅ Master password loaded from server');
+            } catch (decryptErr) {
+                console.error('Failed to decrypt master password:', decryptErr);
+              }
+          }
+              
+          if (settingsRes.recoveryData) {
+            try {
+              const recoveryData = settingsRes.recoveryData;
+                  
+              if (recoveryData.question) {
+                setRecoveryQuestion(recoveryData.question); // Question is plain text
+              }
+                  
+              if (recoveryData.answer) {
+                const decryptedAnswer = encryptionService.decrypt(recoveryData.answer, userId);
+                setRecoveryAnswer(decryptedAnswer);
+              }
+                  
+              localStorage.setItem('recoveryData', JSON.stringify({
+                question: recoveryData.question,
+                answer: recoveryData.answer ? encryptionService.decrypt(recoveryData.answer, userId) : ''
+              }));
+                  
+              console.log('✅ Recovery data loaded from server');
+            } catch (decryptErr) {
+              console.error('Failed to decrypt recovery data:', decryptErr);
+            }
+          }
+              
+          if (settingsRes.theme) {
+            setTheme(settingsRes.theme);
+          }
+        } catch (settingsError) {
+          console.warn('Could not load settings from server:', settingsError);
+        }
+        
+        console.log('✅ Data refreshed');
+        return true;
+    } catch (error) {
+        console.error('❌ Refresh failed:', error);
+        return false;
+    }
+  };
+
   useEffect(() => {
     setGreetingData(getGreetingData());
   }, [currentUser]);
 
-  // Debounce data sync to prevent too many API calls
+  // Add this new useEffect to handle sync results
   useEffect(() => {
-    if (isLoading || !isAuthenticated) return;
-    
-    if (syncTimeout) {
-      clearTimeout(syncTimeout);
-    }
-    
-    const timeout = setTimeout(() => {
-      syncToServer();
-    }, 500);
-    
-    setSyncTimeout(timeout);
-    
-    return () => {
-      if (timeout) clearTimeout(timeout);
+    const handleSyncComplete = (e) => {
+      const { results } = e.detail;
+      
+      // Replace temp IDs with real MongoDB IDs
+      results.forEach(result => {
+        if (result.tempId && result.data?._id) {
+          const realId = result.data._id;
+          
+          switch(result.type) {
+            case 'todo':
+              setTodos(prev => prev.map(t => 
+                t.id === result.tempId ? { ...result.data, id: realId } : t
+              ));
+              break;
+              
+            case 'note':
+              setNotes(prev => prev.map(n => 
+                n.id === result.tempId ? { ...result.data, id: realId } : n
+              ));
+              break;
+              
+            case 'password':
+              setPasswords(prev => prev.map(p => 
+                p.id === result.tempId ? { ...result.data, id: realId } : p
+              ));
+              break;
+              
+            case 'birthday':
+              setBirthdays(prev => prev.map(b => 
+                b.id === result.tempId ? { ...result.data, id: realId } : b
+              ));
+              break;
+              
+            case 'expense':
+              setExpenses(prev => prev.map(e => 
+                e.id === result.tempId ? { ...result.data, id: realId } : e
+              ));
+              break;
+              
+            case 'habit':
+              setHabits(prev => prev.map(h => 
+                h.id === result.tempId ? { ...result.data, id: realId } : h
+              ));
+              break;
+              
+            case 'link':
+              setLinks(prev => prev.map(l => 
+                l.id === result.tempId ? { ...result.data, id: realId } : l
+              ));
+              break;           
+          }
+        }
+      });
     };
-  }, [todos, passwords, notes, birthdays, links, habits, expenses, theme, isAuthenticated, isLoading]);
+    
+    window.addEventListener('syncComplete', handleSyncComplete);
+    return () => window.removeEventListener('syncComplete', handleSyncComplete);
+  }, []);
 
-  // Save data to localStorage
   useEffect(() => {
-    // Only save if we have data or if user is not authenticated
-    if (!isAuthenticated) {
-      if (todos.length > 0 || localStorage.getItem('todos')) {
-        localStorage.setItem('todos', JSON.stringify(todos));
+    if (!isAuthenticated) return;
+
+    // Handle visibility change (app going to background)
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'hidden') {
+        console.log('📱 App going to background, processing queue...');
+        await syncQueue.processQueue();
+      } else {
+        // App coming to foreground, refresh data
+        console.log('📱 App coming to foreground, refreshing data...');
+        await refreshData();
       }
-    }
-  }, [todos, isAuthenticated]);
+    };
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      localStorage.setItem('theme', theme);
-    }
-  }, [theme, isAuthenticated]);
+    // Handle before unload (app closing)
+    const handleBeforeUnload = async (e) => {
+      console.log('🚪 App closing, processing queue...');
+      await syncQueue.processQueue();
+    };
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      if (passwords.length > 0 || localStorage.getItem('passwords')) {
-        localStorage.setItem('passwords', JSON.stringify(passwords));
-      }
-    }
-  }, [passwords, isAuthenticated]);
+    // Handle page hide (more reliable than beforeunload on mobile)
+    const handlePageHide = async () => {
+      console.log('👋 Page hiding, processing queue...');
+      await syncQueue.processQueue();
+    };
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      if (notes.length > 0 || localStorage.getItem('notes')) {
-        localStorage.setItem('notes', JSON.stringify(notes));
-      }
-    }
-  }, [notes, isAuthenticated]);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
 
-  // Save birthdays to localStorage
-  useEffect(() => {
-    if (!isAuthenticated) {
-      if (birthdays.length > 0 || localStorage.getItem('birthdays')) {
-        localStorage.setItem('birthdays', JSON.stringify(birthdays));
-      }
-    }
-  }, [birthdays, isAuthenticated]);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, [isAuthenticated, todos, passwords, notes, birthdays, links, habits, expenses, theme, masterPasswordSet]);
 
-  // Save links to localStorage
-  useEffect(() => {
-    if (!isAuthenticated) {
-      if (links.length > 0 || localStorage.getItem('links')) {
-        localStorage.setItem('links', JSON.stringify(links));
-      }
-    }
-  }, [links, isAuthenticated]);
-
-  // Save habits to localStorage
-  useEffect(() => {
-    if (!isAuthenticated) {
-      if (habits.length > 0 || localStorage.getItem('habits')) {
-        localStorage.setItem('habits', JSON.stringify(habits));
-      }
-    }
-  }, [habits, isAuthenticated]);
-
-  // Save expenses to localStorage
-  useEffect(() => {
-    if (!isAuthenticated) {
-      if (expenses.length > 0 || localStorage.getItem('expenses')) {
-        localStorage.setItem('expenses', JSON.stringify(expenses));
-      }
-    }
-  }, [expenses, isAuthenticated]);
-
-  // Sync watchlist changes to server
-  useEffect(() => {
-    if (isAuthenticated) {
-      const handleWatchlistChange = () => {
-        syncToServer();
-      };
-      
-      // Listen for watchlist changes
-      window.addEventListener('watchlistChange', handleWatchlistChange);
-      
-      return () => window.removeEventListener('watchlistChange', handleWatchlistChange);
-    }
-  }, [isAuthenticated, todos, passwords, notes, birthdays, links, theme]);
-
-  // Check for birthdays and send notifications
   useEffect(() => {
     const checkBirthdays = () => {
       const today = new Date();
@@ -455,18 +619,16 @@ const DailyHub = () => {
     };
 
     checkBirthdays();
-    const interval = setInterval(checkBirthdays, 3600000); // Check every hour
+    const interval = setInterval(checkBirthdays, 3600000);
     return () => clearInterval(interval);
   }, [birthdays]);
 
-  // Request notification permission
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
   }, []);
 
-  // Auto-lock functionality
   useEffect(() => {
     if (!isUnlocked) return;
 
@@ -485,7 +647,6 @@ const DailyHub = () => {
     return () => clearInterval(interval);
   }, [isUnlocked, lastActivity, autoLockTimeout]);
 
-  // Track user activity
   useEffect(() => {
     const updateActivity = () => setLastActivity(Date.now());
     
@@ -500,7 +661,6 @@ const DailyHub = () => {
     };
   }, []);
 
-  // Update time every second
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -508,41 +668,86 @@ const DailyHub = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Load saved city and fetch weather
   useEffect(() => {
     const savedCity = localStorage.getItem('city') || 'Nashik';
     setCity(savedCity);
     fetchWeather(savedCity);
   }, []);
 
-  const getWeatherDescription = (code) => {
-    const descriptions = {
-      0: { description: 'Clear sky', main: 'Clear' },
-      1: { description: 'Mainly clear', main: 'Clear' },
-      2: { description: 'Partly cloudy', main: 'Clouds' },
-      3: { description: 'Overcast', main: 'Clouds' },
-      45: { description: 'Fog', main: 'Fog' },
-      48: { description: 'Depositing rime fog', main: 'Fog' },
-      51: { description: 'Light drizzle', main: 'Drizzle' },
-      53: { description: 'Moderate drizzle', main: 'Drizzle' },
-      55: { description: 'Dense drizzle', main: 'Drizzle' },
-      61: { description: 'Slight rain', main: 'Rain' },
-      63: { description: 'Moderate rain', main: 'Rain' },
-      65: { description: 'Heavy rain', main: 'Rain' },
-      80: { description: 'Slight rain showers', main: 'Rain' },
-      81: { description: 'Moderate rain showers', main: 'Rain' },
-      82: { description: 'Violent rain showers', main: 'Rain' },
-      95: { description: 'Thunderstorm', main: 'Thunderstorm' },
-      96: { description: 'Thunderstorm with slight hail', main: 'Thunderstorm' },
-      99: { description: 'Thunderstorm with heavy hail', main: 'Thunderstorm' },
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (activeGame !== 'word-guess' || wordGuessStatus !== 'playing') return;
+      const key = e.key.toUpperCase();
+      if (key === 'ENTER' && currentGuess.length === 5) {
+        submitGuess();
+      } else if (key === 'BACKSPACE') {
+        setCurrentGuess(prev => prev.slice(0, -1));
+      } else if (currentGuess.length < 5 && /^[A-Z]$/.test(key)) {
+        setCurrentGuess(prev => prev + key);
+      }
     };
-    return descriptions[code] || { description: 'Unknown weather', main: 'Clear' };
+    window.addEventListener('keydown', handleKeyDown);
+
+    let gameInterval;
+    if (isWhacActive && whacTimeLeft > 0) {
+      gameInterval = setInterval(() => {
+        setWhacTimeLeft(time => time - 1);
+        const randomIndex = Math.floor(Math.random() * 9);
+        setMoles(currentMoles => {
+          const newMoles = Array(9).fill(false);
+          newMoles[randomIndex] = true;
+          return newMoles;
+        });
+      }, 1000);
+    } else if (whacTimeLeft === 0 && isWhacActive) {
+      setIsWhacActive(false);
+    }
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      clearInterval(gameInterval);
+    };
+  }, [activeGame, currentGuess, wordGuessStatus, isWhacActive, whacTimeLeft]);
+
+  const getWeatherDescription = (code, isDay = 1) => {
+    const descriptions = {
+      0:  { description: 'Clear sky', main: 'Clear', icon: isDay ? '☀️' : '🌙' },
+      1:  { description: 'Mainly clear', main: 'Clear', icon: isDay ? '🌤️' : '☁️' },
+      2:  { description: 'Partly cloudy', main: 'Clouds', icon: isDay ? '⛅️' : '☁️' },
+      3:  { description: 'Overcast', main: 'Clouds', icon: '☁️' },
+      45: { description: 'Fog', main: 'Fog', icon: '🌫️' },
+      48: { description: 'Depositing rime fog', main: 'Fog', icon: '🌫️' },
+      51: { description: 'Light drizzle', main: 'Drizzle', icon: '🌦️' },
+      53: { description: 'Moderate drizzle', main: 'Drizzle', icon: '🌦️' },
+      55: { description: 'Dense drizzle', main: 'Drizzle', icon: '🌧️' },
+      56: { description: 'Light freezing drizzle', main: 'Drizzle', icon: '🌧️❄️' },
+      57: { description: 'Dense freezing drizzle', main: 'Drizzle', icon: '🌧️❄️' },
+      61: { description: 'Slight rain', main: 'Rain', icon: '🌧️' },
+      63: { description: 'Moderate rain', main: 'Rain', icon: '🌧️' },
+      65: { description: 'Heavy rain', main: 'Rain', icon: '🌧️' },
+      66: { description: 'Light freezing rain', main: 'Rain', icon: '🌧️❄️' },
+      67: { description: 'Heavy freezing rain', main: 'Rain', icon: '🌧️❄️' },
+      71: { description: 'Slight snow fall', main: 'Snow', icon: '🌨️' },
+      73: { description: 'Moderate snow fall', main: 'Snow', icon: '🌨️' },
+      75: { description: 'Heavy snow fall', main: 'Snow', icon: '❄️' },
+      77: { description: 'Snow grains', main: 'Snow', icon: '❄️' },
+      80: { description: 'Slight rain showers', main: 'Rain', icon: '🌦️' },
+      81: { description: 'Moderate rain showers', main: 'Rain', icon: '🌧️' },
+      82: { description: 'Violent rain showers', main: 'Rain', icon: '🌧️🌊' },
+      85: { description: 'Slight snow showers', main: 'Snow', icon: '🌨️' },
+      86: { description: 'Heavy snow showers', main: 'Snow', icon: '❄️' },
+      95: { description: 'Thunderstorm', main: 'Thunderstorm', icon: '⛈️' },
+      96: { description: 'Thunderstorm with slight hail', main: 'Thunderstorm', icon: '⛈️❄️' },
+      99: { description: 'Thunderstorm with heavy hail', main: 'Thunderstorm', icon: '⛈️❄️' },
+    };
+
+    const info = descriptions[Number(code)];
+    return info || { description: 'Unknown weather', main: 'Clear', icon: '☀️' };
   };
 
   const fetchWeather = async (cityName) => {
     setWeatherLoading(true);
     try {
-      // Step 1: Get latitude and longitude for the city name
       const geoResponse = await fetch(
         `https://geocoding-api.open-meteo.com/v1/search?name=${cityName}&count=1&language=en&format=json`
       );
@@ -554,35 +759,92 @@ const DailyHub = () => {
 
       const { latitude, longitude, name } = geoData.results[0];
 
-      // Step 2: Fetch weather using the coordinates
+      const weatherParams = [
+        'temperature_2m',
+        'relative_humidity_2m',
+        'apparent_temperature',
+        'is_day',
+        'precipitation',
+        'weather_code',
+        'wind_speed_10m'
+      ];
+      const dailyParams = [
+        'weather_code',
+        'temperature_2m_max',
+        'temperature_2m_min',
+        'sunrise',
+        'sunset',
+        'precipitation_probability_max'
+      ];
+       const hourlyParams = [
+        'temperature_2m',
+        'weather_code',
+        'precipitation_probability'
+      ];
+
       const weatherResponse = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code`
+        `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=${weatherParams.join(',')}&daily=${dailyParams.join(',')}&hourly=${hourlyParams.join(',')}&timezone=auto`
       );
       const weatherData = await weatherResponse.json();
+
+      const { description, main, icon } = getWeatherDescription(weatherData.current.weather_code, weatherData.current.is_day);
       
-      const { description, main } = getWeatherDescription(weatherData.current.weather_code);
+      const dailyForecast = weatherData.daily.time.map((date, index) => ({
+        date,
+        code: weatherData.daily.weather_code[index],
+        temp_max: Math.round(weatherData.daily.temperature_2m_max[index]),
+        temp_min: Math.round(weatherData.daily.temperature_2m_min[index]),
+        precipitation_probability: weatherData.daily.precipitation_probability_max[index],
+        ...getWeatherDescription(weatherData.daily.weather_code[index])
+      }));
       
-      // Map the data to your existing state structure
+      const now = new Date();
+      const currentHour = now.getHours();
+      const hourlyForecast = weatherData.hourly.time.filter(time => new Date(time).getHours() >= currentHour)
+        .slice(0, 12)
+        .map((time, index) => {
+          const dataIndex = weatherData.hourly.time.findIndex(t => t === time);
+          return {
+            time: new Date(time).toLocaleTimeString('en-US', { hour: 'numeric', hour12: true }),
+            temp: Math.round(weatherData.hourly.temperature_2m[dataIndex]),
+            code: weatherData.hourly.weather_code[dataIndex],
+            precipitation_probability: weatherData.hourly.precipitation_probability[dataIndex],
+            ...getWeatherDescription(weatherData.hourly.weather_code[dataIndex])
+          }
+      });
+
       setWeather({
         name: name,
-        main: {
+        current: {
+          code: weatherData.current.weather_code,
+          is_day: weatherData.current.is_day,
           temp: Math.round(weatherData.current.temperature_2m),
-          // Note: Open-Meteo doesn't provide "feels_like" in this basic call
-          feels_like: Math.round(weatherData.current.temperature_2m), 
-        },
-        weather: [{
+          feels_like: Math.round(weatherData.current.apparent_temperature),
+          humidity: weatherData.current.relative_humidity_2m,
+          wind_speed: weatherData.current.wind_speed_10m,
           description: description,
           main: main,
-        }],
+          icon: icon,
+        },
+        today: {
+            temp_max: Math.round(weatherData.daily.temperature_2m_max[0]),
+            temp_min: Math.round(weatherData.daily.temperature_2m_min[0]),
+            sunrise: weatherData.daily.sunrise[0],
+            sunset: weatherData.daily.sunset[0],
+        },
+        daily: dailyForecast,
+        hourly: hourlyForecast
       });
 
     } catch (error) {
       console.error("Failed to fetch weather:", error);
-      // Fallback state in case of an error
-      setWeather({
+      showToast('Could not fetch weather data.', 'error');
+      setWeather({ // Set a default error state
         name: cityName,
-        main: { temp: '--', feels_like: '--' },
-        weather: [{ description: 'Weather unavailable', main: 'Clear' }],
+        current: { temp: '--', feels_like: '--', description: 'Weather unavailable', main: 'Clear', icon: '🤷' },
+        today: { temp_max: '--', temp_min: '--' },
+        daily: [],
+        hourly: [],
       });
     } finally {
       setWeatherLoading(false);
@@ -612,7 +874,6 @@ const DailyHub = () => {
     });
   };
 
-  // Toast functions
   const showToast = (message, type = 'success') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
@@ -621,23 +882,41 @@ const DailyHub = () => {
     }, 3000);
   };
 
-  const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
+  const toggleTheme = async () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    
+    if (isAuthenticated) {
+        try {
+            await authService.updateSettings({ theme: newTheme });
+        } catch (error) {
+            console.error("Failed to sync theme", error);
+        }
+    }
   };
 
-  // Todo functions
-  const addTodo = () => {
+  const addTodo = async () => {
     if (newTodo.trim()) {
+      const tempId = `temp_${Date.now()}`;
       const todo = {
-        id: Date.now(),
         text: newTodo,
         completed: false,
         priority: 'medium',
         createdAt: new Date().toISOString(),
         category: 'general'
       };
-      setTodos([todo, ...todos]);
+      
+      // Optimistic update
+      const optimisticTodo = { ...todo, id: tempId };
+      setTodos([optimisticTodo, ...todos]);
       setNewTodo('');
+      
+      // Add to sync queue (handles both online and offline)
+      if (isAuthenticated) {
+        syncQueue.add('todo', 'create', todo, tempId);
+      }
+      
       showToast('Task added successfully!');
     }
   };
@@ -648,14 +927,30 @@ const DailyHub = () => {
     }
   };
 
-  const toggleTodo = (id) => {
-    setTodos(todos.map(todo => 
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    ));
+  const toggleTodo = async (id) => {
+    const todo = todos.find(t => t.id === id);
+    if (!todo) return;
+    
+    const updatedTodo = { ...todo, completed: !todo.completed, id };
+    
+    // Optimistic update
+    setTodos(todos.map(t => t.id === id ? updatedTodo : t));
+    
+    // Add to sync queue
+    if (isAuthenticated) {
+      syncQueue.add('todo', 'update', updatedTodo, id);
+    }
   };
 
-  const deleteTodo = (id) => {
+  const deleteTodo = async (id) => {
+    // Optimistic update
     setTodos(todos.filter(todo => todo.id !== id));
+    
+    // Add to sync queue
+    if (isAuthenticated) {
+      syncQueue.add('todo', 'delete', { _id: id }, id);
+    }
+    
     showToast('Task deleted', 'info');
   };
 
@@ -665,7 +960,6 @@ const DailyHub = () => {
     ));
   };
 
-  // Password Manager Functions
   const generatePassword = () => {
     let charset = '';
     if (includeUppercase) charset += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -691,7 +985,7 @@ const DailyHub = () => {
     showToast('Copied to clipboard!');
   };
 
-  const setupMasterPassword = () => {
+  const setupMasterPassword = async () => {
     if (passwordInput.length < 6) {
       showToast('Master password must be at least 6 characters', 'error');
       return;
@@ -700,17 +994,42 @@ const DailyHub = () => {
       showToast('Please set up recovery question and answer', 'error');
       return;
     }
+    
+    // Save to localStorage first
     localStorage.setItem('masterPassword', passwordInput);
-    localStorage.setItem('recoveryData', JSON.stringify({
+    const recoveryData = {
       question: recoveryQuestion,
       answer: recoveryAnswer.toLowerCase()
-    }));
+    };
+    localStorage.setItem('recoveryData', JSON.stringify(recoveryData));
+    
+    // Update state
     setMasterPassword(passwordInput);
     setMasterPasswordSet(true);
     setIsUnlocked(true);
     setPasswordInput('');
     setLastActivity(Date.now());
+    
+    console.log('✅ Master password set in localStorage and state');
     showToast('Master password created successfully!');
+    
+    // Immediately sync to server if authenticated
+    if (isAuthenticated) {
+      console.log('🔄 Syncing master password to server...');
+      try {
+        const userId = localStorage.getItem('userId');
+        const encryptedMasterPass = encryptionService.encryptMasterPassword(passwordInput, userId);
+        const encryptedRecovery = encryptionService.encryptRecoveryData(recoveryData, userId);
+        
+        await authService.updateSettings({
+          masterPassword: encryptedMasterPass,
+          recoveryData: encryptedRecovery
+        });
+      } catch (error) {
+        console.error("Failed to sync master password", error);
+        showToast('Failed to sync master password to server', 'warning');
+      }
+    }
   };
 
   const unlockVault = () => {
@@ -745,20 +1064,23 @@ const DailyHub = () => {
     setShowAddPassword(false);
   };
 
-  const addPasswordEntry = () => {
+  const addPasswordEntry = async () => {
     if (!newPasswordEntry.title || !newPasswordEntry.password) {
       showToast('Title and Password are required', 'error');
       return;
     }
     
+    const tempId = `temp_${Date.now()}`;
     const entry = {
-      id: Date.now(),
       ...newPasswordEntry,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
     
-    setPasswords([entry, ...passwords]);
+    // Optimistic update (unencrypted for local view)
+    const optimisticEntry = { ...entry, id: tempId };
+    setPasswords([optimisticEntry, ...passwords]);
+    
     setNewPasswordEntry({
       title: '',
       username: '',
@@ -769,12 +1091,24 @@ const DailyHub = () => {
     });
     setShowAddPassword(false);
     setLastActivity(Date.now());
+    
+    if (isAuthenticated) {
+      const userId = localStorage.getItem('userId');
+      const encryptedEntry = encryptionService.encryptPasswordEntry(entry, userId);
+      syncQueue.add('password', 'create', encryptedEntry, tempId);
+    }
+    
     showToast('Password saved successfully!');
   };
 
-  const deletePasswordEntry = (id) => {
+  const deletePasswordEntry = async (id) => {
     setPasswords(passwords.filter(p => p.id !== id));
     setLastActivity(Date.now());
+    
+    if (isAuthenticated) {
+      syncQueue.add('password', 'delete', { id }, id);
+    }
+    
     showToast('Password deleted', 'info');
   };
 
@@ -787,28 +1121,43 @@ const DailyHub = () => {
 
   const categories = ['general', 'social', 'banking', 'work', 'email', 'shopping', 'other'];
 
-  // Notes Functions
-  const addOrUpdateNote = () => {
+  const addOrUpdateNote = async () => {
     if (!currentNote.title.trim()) {
       showToast('Note title is required', 'error');
       return;
     }
 
     if (editingNote) {
-      setNotes(notes.map(note => 
-        note.id === editingNote.id 
-          ? { ...currentNote, id: editingNote.id, updatedAt: new Date().toISOString() }
-          : note
-      ));
+      // Update existing
+      const updatedNote = { 
+        ...editingNote, 
+        ...currentNote, 
+        updatedAt: new Date().toISOString() 
+      };
+      
+      setNotes(notes.map(note => note.id === editingNote.id ? updatedNote : note));
+      
+      if (isAuthenticated) {
+        syncQueue.add('note', 'update', updatedNote, editingNote.id);
+      }
+      
       showToast('Note updated successfully!');
     } else {
+      // Create new
+      const tempId = `temp_${Date.now()}`;
       const newNote = {
         ...currentNote,
-        id: Date.now(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      setNotes([newNote, ...notes]);
+      
+      const optimisticNote = { ...newNote, id: tempId };
+      setNotes([optimisticNote, ...notes]);
+      
+      if (isAuthenticated) {
+        syncQueue.add('note', 'create', newNote, tempId);
+      }
+      
       showToast('Note added successfully!');
     }
 
@@ -817,8 +1166,13 @@ const DailyHub = () => {
     setEditingNote(null);
   };
 
-  const deleteNote = (id) => {
+  const deleteNote = async (id) => {
     setNotes(notes.filter(note => note.id !== id));
+    
+    if (isAuthenticated) {
+      syncQueue.add('note', 'delete', { id }, id);
+    }
+    
     showToast('Note deleted', 'info');
   };
 
@@ -837,27 +1191,38 @@ const DailyHub = () => {
 
   const noteCategories = ['personal', 'work', 'ideas', 'shopping', 'recipes', 'other'];
 
-  // Birthday Functions
-  const addBirthday = () => {
-    if (!newBirthday.name || !newBirthday.date) {
+  const addBirthday = async () => {
+    if (newBirthday.name && newBirthday.date) {
+      const tempId = `temp_${Date.now()}`;
+      const birthday = {
+        ...newBirthday,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      const optimisticBirthday = { ...birthday, id: tempId };
+      setBirthdays([...birthdays, optimisticBirthday]);
+      
+      setNewBirthday({ name: '', date: '' });
+      setShowAddBirthday(false);
+      
+      if (isAuthenticated) {
+        syncQueue.add('birthday', 'create', birthday, tempId);
+      }
+      
+      showToast('Birthday added successfully!');
+    } else {
       showToast('Name and date are required', 'error');
-      return;
     }
-    
-    const birthday = {
-      id: Date.now(),
-      ...newBirthday,
-      createdAt: new Date().toISOString()
-    };
-    
-    setBirthdays([birthday, ...birthdays]);
-    setNewBirthday({ name: '', date: '', category: 'family' });
-    setShowAddBirthday(false);
-    showToast('Birthday added successfully!');
   };
 
-  const deleteBirthday = (id) => {
+  const deleteBirthday = async (id) => {
     setBirthdays(birthdays.filter(b => b.id !== id));
+    
+    if (isAuthenticated) {
+      syncQueue.add('birthday', 'delete', { id }, id);
+    }
+    
     showToast('Birthday deleted', 'info');
   };
 
@@ -877,7 +1242,6 @@ const DailyHub = () => {
       .slice(0, 5);
   };
 
-  // Unit Converter Functions
   const conversionRates = {
     length: {
       meter: 1,
@@ -972,38 +1336,16 @@ const DailyHub = () => {
     setCurrentUser(userData);
     setShowAuthModal(false);
     
-    showToast('Loading your data...', 'info');
+    showToast(`Welcome back, ${userData.username}!`, 'success');
     
-    // Load user data from server
     try {
-      const data = await authService.getData();
-      console.log('📥 Login - Data from server:', data);
-      
-      // Set all data from server - DON'T save to localStorage yet
-      setTodos(data.todos || []);
-      setPasswords(data.passwords || []);
-      setNotes(data.notes || []);
-      setBirthdays(data.birthdays || []);
-      setLinks(data.links || []);
-      setExpenses(data.expenses || []);
-      setHabits(data.habits || []);
-      
-      if (data.watchlist && data.watchlist.length > 0) {
-        localStorage.setItem('watchlist', JSON.stringify(data.watchlist));
-        window.dispatchEvent(new Event('storage'));
-      }
-      
-      if (data.theme) {
-        setTheme(data.theme);
-      }
-      
+      // Load granular data
+      await refreshData();   
       showToast('Login successful! Data loaded.', 'success');
-      
-      // NO PAGE REFRESH - let React handle the state update
-      console.log('✅ Data loaded, no refresh needed');
+
     } catch (error) {
       console.error('Failed to load user data:', error);
-      showToast('Login successful but failed to load data. Please refresh.', 'warning');
+      showToast('Login successful but failed to load data.', 'warning');
     }
   };
 
@@ -1012,45 +1354,57 @@ const DailyHub = () => {
   };
 
   const confirmLogout = async () => {
-    // Sync data one final time before logout
     showToast('Syncing data before logout...', 'info');
     
     try {
-      await syncToServer();
-      console.log('✅ Final sync completed');
+      // Final sync with timeout
+      await Promise.race([
+        syncQueue.processQueue(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Sync timeout')), 5000)
+        )
+      ]);
     } catch (error) {
       console.error('Failed final sync:', error);
+      showToast('Sync timeout - logging out anyway', 'warning');
     }
     
-    // Small delay to ensure sync completes
-    setTimeout(() => {
-      authService.logout();
-      setIsAuthenticated(false);
-      setCurrentUser(null);
-      
-      // Clear all data on logout
+    // Clear all state
+    const clearState = () => {
       setTodos([]);
       setPasswords([]);
       setNotes([]);
       setBirthdays([]);
       setLinks([]);
-      localStorage.removeItem('watchlist');
-      localStorage.removeItem('todos');
-      localStorage.removeItem('passwords');
-      localStorage.removeItem('notes');
-      localStorage.removeItem('birthdays');
-      localStorage.removeItem('links');
-      localStorage.removeItem('habits');
-      localStorage.removeItem('expenses');
+      setHabits([]);
+      setExpenses([]);
+      setMasterPasswordSet(false);
+      setIsUnlocked(false);
+    };
+
+    // Clear localStorage
+    const clearStorage = () => {
+      const keysToKeep = ['theme']; // Keep theme preference
+      const allKeys = Object.keys(localStorage);
       
-      showToast('Logged out successfully', 'info');
-      setShowLogoutConfirm(false);
-      
-      // Refresh page after logout
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
-    }, 1000);
+      allKeys.forEach(key => {
+        if (!keysToKeep.includes(key)) {
+          localStorage.removeItem(key);
+        }
+      });
+    };
+
+    clearState();
+    clearStorage();
+    authService.logout();
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    
+    showToast('Logged out successfully', 'info');
+    setShowLogoutConfirm(false);
+    
+    // Navigate to dashboard
+    setActiveView('dashboard');
   };
 
   const swapUnits = () => {
@@ -1071,7 +1425,6 @@ const DailyHub = () => {
     setOutputValue('');
   };
 
-  // Memory Match Game Functions
   const initMemoryGame = () => {
     const emojis = ['🎮', '🎯', '🎲', '🎪', '🎨', '🎭', '🎸', '🎹'];
     const cards = [...emojis, ...emojis]
@@ -1108,7 +1461,6 @@ const DailyHub = () => {
     }
   };
 
-  // Number Guessing Game Functions
   const initGuessingGame = () => {
     setTargetNumber(Math.floor(Math.random() * 100) + 1);
     setGuessNumber('');
@@ -1142,7 +1494,6 @@ const DailyHub = () => {
     setGuessNumber('');
   };
 
-  // Reaction Time Game Functions
   const startReactionTest = () => {
     setReactionWaiting(true);
     const delay = Math.random() * 3000 + 2000;
@@ -1167,12 +1518,6 @@ const DailyHub = () => {
     }
   };
 
-  // --- State for Tic-Tac-Toe ---
-  const [ticTacToeBoard, setTicTacToeBoard] = useState(Array(9).fill(null));
-  const [currentPlayer, setCurrentPlayer] = useState('X');
-  const [ticTacToeWinner, setTicTacToeWinner] = useState(null);
-
-  // --- Logic for Tic-Tac-Toe ---
   const initTicTacToe = () => {
     setTicTacToeBoard(Array(9).fill(null));
     setTicTacToeWinner(null);
@@ -1181,9 +1526,9 @@ const DailyHub = () => {
 
   const checkTicTacToeWinner = (board) => {
     const lines = [
-      [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
-      [0, 3, 6], [1, 4, 7], [2, 5, 8], // columns
-      [0, 4, 8], [2, 4, 6]             // diagonals
+      [0, 1, 2], [3, 4, 5], [6, 7, 8],
+      [0, 3, 6], [1, 4, 7], [2, 5, 8],
+      [0, 4, 8], [2, 4, 6]
     ];
     for (let i = 0; i < lines.length; i++) {
       const [a, b, c] = lines[i];
@@ -1209,222 +1554,6 @@ const DailyHub = () => {
     }
   };
 
-  const FIVE_LETTER_WORDS = ['REACT', 'HELLO', 'WORLD', 'GAMES', 'THEME', 'STYLE', 'QUERY'];
-  const TYPING_TEXT = "The quick brown fox jumps over the lazy dog. This sentence contains every letter of the alphabet. Practice makes perfect.";
-
-  // --- State for Word Guess ---
-  const [wordGuessSolution, setWordGuessSolution] = useState('');
-  const [wordGuesses, setWordGuesses] = useState([]);
-  const [currentGuess, setCurrentGuess] = useState('');
-  const [wordGuessStatus, setWordGuessStatus] = useState('playing');
-
-  // --- State for Typing Test ---
-  const [typingText] = useState(TYPING_TEXT);
-  const [userInput, setUserInput] = useState('');
-  const [typingStatus, setTypingStatus] = useState('waiting');
-  const [startTime, setStartTime] = useState(null);
-  const [wpm, setWpm] = useState(0);
-  const [accuracy, setAccuracy] = useState(0);
-
-  // --- State for Whac-A-Mole ---
-  const [moles, setMoles] = useState(Array(9).fill(false));
-  const [whacScore, setWhacScore] = useState(0);
-  const [whacTimeLeft, setWhacTimeLeft] = useState(0);
-  const [isWhacActive, setIsWhacActive] = useState(false);
-
-  // --- State for Simon Says ---
-  const [simonSequence, setSimonSequence] = useState([]);
-  const [playerSequence, setPlayerSequence] = useState([]);
-  const [isPlayerTurn, setIsPlayerTurn] = useState(false);
-  const [simonStatus, setSimonStatus] = useState('waiting');
-  const [litButton, setLitButton] = useState(null);
-
-  // --- State for Connect Four ---
-  const [connectFourBoard, setConnectFourBoard] = useState(Array(6).fill(Array(7).fill(null)));
-  const [cfCurrentPlayer, setCfCurrentPlayer] = useState('player');
-  const [connectFourWinner, setConnectFourWinner] = useState(null);
-
-  // --- Logic for Simon Says ---
-  const initSimonGame = () => {
-    setSimonSequence([]);
-    setPlayerSequence([]);
-    setIsPlayerTurn(false);
-    setSimonStatus('playing');
-    // Use a timeout to kick off the first turn
-    setTimeout(addSimonStep, 500);
-  };
-
-  const playSequence = (sequence) => {
-    setIsPlayerTurn(false);
-    let i = 0;
-    const interval = setInterval(() => {
-      setLitButton(sequence[i]);
-      setTimeout(() => setLitButton(null), 400); // Light duration
-      i++;
-      if (i >= sequence.length) {
-        clearInterval(interval);
-        setIsPlayerTurn(true);
-        setPlayerSequence([]);
-      }
-    }, 800); // Time between lights
-  };
-
-  const addSimonStep = () => {
-    const colors = ['green', 'red', 'yellow', 'blue'];
-    const nextColor = colors[Math.floor(Math.random() * 4)];
-    setSimonSequence(currentSequence => {
-    const newSequence = [...currentSequence, nextColor];
-    playSequence(newSequence);
-    return newSequence;
-  });
-  };
-
-  const handleSimonClick = (color) => {
-    const newPlayerSequence = [...playerSequence, color];
-    setPlayerSequence(newPlayerSequence);
-
-    // Check if the latest click was correct
-    if (newPlayerSequence[newPlayerSequence.length - 1] !== simonSequence[newPlayerSequence.length - 1]) {
-      setSimonStatus('lost');
-      showToast(`Game Over! You reached level ${simonSequence.length}`, 'error');
-      return;
-    }
-
-    // Check if the turn is complete
-    if (newPlayerSequence.length === simonSequence.length) {
-      setTimeout(addSimonStep, 1000);
-    }
-  };
-
-  // --- Logic for Connect Four ---
-  const initConnectFour = () => {
-    setConnectFourBoard(Array(6).fill(Array(7).fill(null)));
-    setConnectFourWinner(null);
-    setCfCurrentPlayer('player');
-  };
-
-  const checkForWinner = (board) => {
-      // Check horizontal, vertical, and diagonal wins
-      const ROWS = 6;
-      const COLS = 7;
-      const checkLine = (a, b, c, d) => a !== null && a === b && a === c && a === d;
-
-      for (let r = 0; r < ROWS; r++) {
-          for (let c = 0; c < COLS; c++) {
-              // Horizontal
-              if (c + 3 < COLS && checkLine(board[r][c], board[r][c+1], board[r][c+2], board[r][c+3])) return board[r][c];
-              // Vertical
-              if (r + 3 < ROWS && checkLine(board[r][c], board[r+1][c], board[r+2][c], board[r+3][c])) return board[r][c];
-              // Diagonal (down-right)
-              if (r + 3 < ROWS && c + 3 < COLS && checkLine(board[r][c], board[r+1][c+1], board[r+2][c+2], board[r+3][c+3])) return board[r][c];
-              // Diagonal (up-right)
-              if (r - 3 >= 0 && c + 3 < COLS && checkLine(board[r][c], board[r-1][c+1], board[r-2][c+2], board[r-3][c+3])) return board[r][c];
-          }
-      }
-      // Check for draw
-      if (board.every(row => row.every(cell => cell !== null))) return 'draw';
-      return null;
-  };
-
-  const handleColumnClick = (colIndex) => {
-      if (connectFourWinner || cfCurrentPlayer !== 'player') return;
-
-      let newBoard = connectFourBoard.map(row => [...row]);
-      let rowPlaced = false;
-
-      for (let r = 5; r >= 0; r--) {
-          if (newBoard[r][colIndex] === null) {
-              newBoard[r][colIndex] = 'player';
-              rowPlaced = true;
-              break;
-          }
-      }
-
-      if (!rowPlaced) {
-        showToast('This column is full!', 'warning');
-        return;
-      }
-
-      setConnectFourBoard(newBoard);
-      const winner = checkForWinner(newBoard);
-      if (winner) {
-          setConnectFourWinner(winner);
-      } else {
-          setCfCurrentPlayer('ai');
-          setTimeout(() => handleAiMove(newBoard), 500); // AI moves after a short delay
-      }
-  };
-
-  const handleAiMove = (currentBoard) => {
-      let newBoard = currentBoard.map(row => [...row]);
-      let availableCols = [];
-      for (let c = 0; c < 7; c++) {
-        if (newBoard[0][c] === null) {
-          availableCols.push(c);
-        }
-      }
-
-      if(availableCols.length === 0) return;
-
-      const randomCol = availableCols[Math.floor(Math.random() * availableCols.length)];
-      
-      for (let r = 5; r >= 0; r--) {
-          if (newBoard[r][randomCol] === null) {
-              newBoard[r][randomCol] = 'ai';
-              break;
-          }
-      }
-
-      setConnectFourBoard(newBoard);
-      const winner = checkForWinner(newBoard);
-      if (winner) {
-        setConnectFourWinner(winner);
-      } else {
-        setCfCurrentPlayer('player');
-      }
-  };
-
-  // Add useEffect for game loops/listeners
-  useEffect(() => {
-    // Word Guess Keyboard Listener
-    const handleKeyDown = (e) => {
-      if (activeGame !== 'word-guess' || wordGuessStatus !== 'playing') return;
-      const key = e.key.toUpperCase();
-      if (key === 'ENTER' && currentGuess.length === 5) {
-        submitGuess();
-      } else if (key === 'BACKSPACE') {
-        setCurrentGuess(prev => prev.slice(0, -1));
-      } else if (currentGuess.length < 5 && /^[A-Z]$/.test(key)) {
-        setCurrentGuess(prev => prev + key);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-
-    // Whac-A-Mole Game Timer
-    let gameInterval;
-    if (isWhacActive && whacTimeLeft > 0) {
-      gameInterval = setInterval(() => {
-        setWhacTimeLeft(time => time - 1);
-        // Make a new mole pop up
-        const randomIndex = Math.floor(Math.random() * 9);
-        setMoles(currentMoles => {
-          const newMoles = Array(9).fill(false);
-          newMoles[randomIndex] = true;
-          return newMoles;
-        });
-      }, 1000);
-    } else if (whacTimeLeft === 0 && isWhacActive) {
-      setIsWhacActive(false);
-    }
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      clearInterval(gameInterval);
-    };
-  }, [activeGame, currentGuess, wordGuessStatus, isWhacActive, whacTimeLeft]);
-
-
-  // --- Logic for Word Guess ---
   const initWordGuess = () => {
     const newSolution = FIVE_LETTER_WORDS[Math.floor(Math.random() * FIVE_LETTER_WORDS.length)];
     setWordGuessSolution(newSolution);
@@ -1451,7 +1580,6 @@ const DailyHub = () => {
     }
   };
 
-  // --- Logic for Typing Test ---
   const initTypingTest = () => {
     setUserInput('');
     setTypingStatus('waiting');
@@ -1468,7 +1596,6 @@ const DailyHub = () => {
     }
     
     if (value.length >= typingText.length) {
-      // Finish game
       setUserInput(typingText);
       setTypingStatus('finished');
       const endTime = Date.now();
@@ -1489,18 +1616,146 @@ const DailyHub = () => {
     }
   };
 
-  // --- Logic for Whac-A-Mole ---
   const initWhacAMole = () => {
     setIsWhacActive(true);
     setWhacScore(0);
-    setWhacTimeLeft(30); // 30 seconds game
+    setWhacTimeLeft(30);
     setMoles(Array(9).fill(false));
   };
 
   const handleMoleWhack = (index) => {
     if (moles[index]) {
       setWhacScore(score => score + 1);
-      setMoles(Array(9).fill(false)); // Hide mole after whack
+      setMoles(Array(9).fill(false));
+    }
+  };
+
+  const initSimonGame = () => {
+    setSimonSequence([]);
+    setPlayerSequence([]);
+    setIsPlayerTurn(false);
+    setSimonStatus('playing');
+    setTimeout(addSimonStep, 500);
+  };
+
+  const playSequence = (sequence) => {
+    setIsPlayerTurn(false);
+    let i = 0;
+    const interval = setInterval(() => {
+      setLitButton(sequence[i]);
+      setTimeout(() => setLitButton(null), 400);
+      i++;
+      if (i >= sequence.length) {
+        clearInterval(interval);
+        setIsPlayerTurn(true);
+        setPlayerSequence([]);
+      }
+    }, 800);
+  };
+
+  const addSimonStep = () => {
+    const colors = ['green', 'red', 'yellow', 'blue'];
+    const nextColor = colors[Math.floor(Math.random() * 4)];
+    setSimonSequence(currentSequence => {
+      const newSequence = [...currentSequence, nextColor];
+      playSequence(newSequence);
+      return newSequence;
+    });
+  };
+
+  const handleSimonClick = (color) => {
+    const newPlayerSequence = [...playerSequence, color];
+    setPlayerSequence(newPlayerSequence);
+
+    if (newPlayerSequence[newPlayerSequence.length - 1] !== simonSequence[newPlayerSequence.length - 1]) {
+      setSimonStatus('lost');
+      showToast(`Game Over! You reached level ${simonSequence.length}`, 'error');
+      return;
+    }
+
+    if (newPlayerSequence.length === simonSequence.length) {
+      setTimeout(addSimonStep, 1000);
+    }
+  };
+
+  const initConnectFour = () => {
+    setConnectFourBoard(Array(6).fill(Array(7).fill(null)));
+    setConnectFourWinner(null);
+    setCfCurrentPlayer('player');
+  };
+
+  const checkForWinner = (board) => {
+    const ROWS = 6;
+    const COLS = 7;
+    const checkLine = (a, b, c, d) => a !== null && a === b && a === c && a === d;
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (c + 3 < COLS && checkLine(board[r][c], board[r][c+1], board[r][c+2], board[r][c+3])) return board[r][c];
+        if (r + 3 < ROWS && checkLine(board[r][c], board[r+1][c], board[r+2][c], board[r+3][c])) return board[r][c];
+        if (r + 3 < ROWS && c + 3 < COLS && checkLine(board[r][c], board[r+1][c+1], board[r+2][c+2], board[r+3][c+3])) return board[r][c];
+        if (r - 3 >= 0 && c + 3 < COLS && checkLine(board[r][c], board[r-1][c+1], board[r-2][c+2], board[r-3][c+3])) return board[r][c];
+      }
+    }
+    if (board.every(row => row.every(cell => cell !== null))) return 'draw';
+    return null;
+  };
+
+  const handleColumnClick = (colIndex) => {
+    if (connectFourWinner || cfCurrentPlayer !== 'player') return;
+
+    let newBoard = connectFourBoard.map(row => [...row]);
+    let rowPlaced = false;
+
+    for (let r = 5; r >= 0; r--) {
+      if (newBoard[r][colIndex] === null) {
+        newBoard[r][colIndex] = 'player';
+        rowPlaced = true;
+        break;
+      }
+    }
+
+    if (!rowPlaced) {
+      showToast('This column is full!', 'warning');
+      return;
+    }
+
+    setConnectFourBoard(newBoard);
+    const winner = checkForWinner(newBoard);
+    if (winner) {
+      setConnectFourWinner(winner);
+    } else {
+      setCfCurrentPlayer('ai');
+      setTimeout(() => handleAiMove(newBoard), 500);
+    }
+  };
+
+  const handleAiMove = (currentBoard) => {
+    let newBoard = currentBoard.map(row => [...row]);
+    let availableCols = [];
+    for (let c = 0; c < 7; c++) {
+      if (newBoard[0][c] === null) {
+        availableCols.push(c);
+      }
+    }
+
+    if(availableCols.length === 0) return;
+
+    const randomCol = availableCols[Math.floor(Math.random() * availableCols.length)];
+    
+    for (let r = 5; r >= 0; r--) {
+      if (newBoard[r][randomCol] === null) {
+        newBoard[r][randomCol] = 'ai';
+        break;
+      }
+    }
+
+    setConnectFourBoard(newBoard);
+    const winner = checkForWinner(newBoard);
+    if (winner) {
+      setConnectFourWinner(winner);
+    } else {
+      setCfCurrentPlayer('player');
     }
   };
 
@@ -1533,33 +1788,15 @@ const DailyHub = () => {
     completed: todos.filter(t => t.completed).length
   };
 
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'todos', label: 'Tasks', icon: CheckSquare },
-    { id: 'aichat', label: 'Chat with AI', icon: Bot },
-    { id: 'news', label: 'News Feed', icon: Newspaper },
-    { id: 'birthdays', label: 'Birthdays', icon: Cake },
-    { id: 'passwords', label: 'Passwords', icon: Key },
-    { id: 'notes', label: 'Notes', icon: StickyNote },
-    { id: 'habits', label: 'Habits', icon: Goal },
-    { id: 'expenses', label: 'Expenses', icon: HandCoins },
-    { id: 'watchlist', label: 'Watchlist', icon: Clapperboard },
-    { id: 'cricket', label: 'Cricket Scores', icon: '🏏' },
-    { id: 'music', label: 'Music Player', icon: Music },
-    { id: 'games', label: 'Games', icon: Gamepad2 },
-    { id: 'links', label: 'Quick Links', icon: Link2 },
-    { id: 'calculator', label: 'Calculator', icon: CalculatorIcon },
-    { id: 'converter', label: 'Unit Converter', icon: Gauge },
-    { id: 'textcounter', label: 'Text Counter', icon: ScanText },
-    { id: 'timezone', label: 'Time Zones', icon: CalendarClock },
-    { id: 'pdftools', label: 'PDF Tools', icon: FileText },
-    
+  // Quick action items for FAB menu - Enhanced
+  const fabActions = [
+    { id: 'add-todo', label: 'Task', icon: CheckSquare, action: () => { setActiveView('todos'); setShowFABMenu(false); } },
+    { id: 'add-note', label: 'Note', icon: StickyNote, action: () => { setActiveView('notes'); setShowAddNote(true); setShowFABMenu(false); } },
+    { id: 'add-birthday', label: 'Birthday', icon: Cake, action: () => { setActiveView('birthdays'); setShowAddBirthday(true); setShowFABMenu(false); } },
+    { id: 'add-link', label: 'Link', icon: Link2, action: () => { setActiveView('links'); setShowFABMenu(false); } },
+    { id: 'add-habit', label: 'Habit', icon: Goal, action: () => { setActiveView('habits'); setShowFABMenu(false); } },
+    { id: 'add-expense', label: 'Expense', icon: HandCoins, action: () => { setActiveView('expenses'); setShowFABMenu(false); } },
   ];
-
-  // Add account view if authenticated
-  if (isAuthenticated) {
-    navItems.splice(1, 0, { id: 'account', label: 'Account', icon: User });
-  }
 
   const bgColor = theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50';
   const cardBg = theme === 'dark' ? 'bg-gray-800' : 'bg-white';
@@ -1568,7 +1805,7 @@ const DailyHub = () => {
   const borderColor = theme === 'dark' ? 'border-gray-700' : 'border-gray-200';
 
   return (
-    <div className={`min-h-screen ${bgColor} ${textColor} transition-colors duration-200`}>
+    <div className={`app-container ${bgColor} ${textColor}`}>
       {/* Auth Modal */}
       {showAuthModal && (
         <AuthModal 
@@ -1580,22 +1817,22 @@ const DailyHub = () => {
 
       {/* Logout Confirmation Modal */}
       {showLogoutConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className={`${cardBg} p-8 rounded-xl border ${borderColor} max-w-md w-full mx-4`}>
-            <h3 className="text-2xl font-bold mb-4">Confirm Logout</h3>
-            <p className={`${textSecondary} mb-6`}>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`${cardBg} p-6 rounded-2xl border ${borderColor} max-w-sm w-full`}>
+            <h3 className="text-xl font-bold mb-3">Confirm Logout</h3>
+            <p className={`${textSecondary} mb-6 text-sm`}>
               Are you sure you want to logout? Your data will be saved to the server.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={confirmLogout}
-                className="flex-1 px-4 py-3 bg-red-500 text-white rounded-lg transition-all duration-200 hover:bg-red-600 hover:scale-105 active:scale-95"
+                className="flex-1 px-4 py-3 bg-red-500 text-white rounded-xl font-medium"
               >
-                Yes, Logout
+                Logout
               </button>
               <button
                 onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 px-4 py-3 bg-gray-500 text-white rounded-lg transition-all duration-200 hover:bg-gray-600 hover:scale-105 active:scale-95"
+                className="flex-1 px-4 py-3 bg-gray-500 text-white rounded-xl font-medium"
               >
                 Cancel
               </button>
@@ -1604,1726 +1841,1725 @@ const DailyHub = () => {
         </div>
       )}
 
-      {/* Toast Notifications */}
-      <div className="fixed top-20 right-4 z-50 space-y-2">
+      {/* Toast Notifications - Android Style */}
+      <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 space-y-2 w-full max-w-sm px-4">
         {toasts.map(toast => (
           <div
             key={toast.id}
-            className={`px-4 py-3 rounded-lg shadow-lg ${
-              toast.type === 'success' ? 'bg-green-500 text-white' :
-              toast.type === 'error' ? 'bg-red-500 text-white' :
-              toast.type === 'warning' ? 'bg-orange-500 text-white' :
-              'bg-blue-500 text-white'
-            }`}
+            className={`px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-sm ${
+              toast.type === 'success' ? 'bg-green-500/90 text-white' :
+              toast.type === 'error' ? 'bg-red-500/90 text-white' :
+              toast.type === 'warning' ? 'bg-orange-500/90 text-white' :
+              'bg-blue-500/90 text-white'
+            } animate-pop-up`}
           >
-            {toast.message}
+            <p className="text-sm font-medium text-center">{toast.message}</p>
           </div>
         ))}
       </div>
 
-      {/* Header */}
-      <header className={`${cardBg} border-b ${borderColor} sticky top-0 z-40`}>
-        <div className="flex items-center justify-between px-4 py-3">
+      {/* Desktop Sidebar - visible on lg+ screens */}
+      <aside className={`desktop-sidebar ${cardBg} ${borderColor}`}>
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <h1 className="text-xl font-bold text-blue-500">Daily Hub</h1>
+          <p className={`text-xs ${textSecondary} mt-1`}>Productivity Dashboard</p>
+        </div>
+        <nav className="p-3 space-y-1 flex-1 overflow-y-auto">
+          {[
+            { id: 'dashboard', label: 'Dashboard', icon: Home },
+            { id: 'todos', label: 'Tasks', icon: CheckSquare },
+            { id: 'notes', label: 'Notes', icon: StickyNote },
+            { id: 'passwords', label: 'Passwords', icon: Key },
+            { id: 'habits', label: 'Habits', icon: Goal },
+            { id: 'expenses', label: 'Expenses', icon: HandCoins },
+            { id: 'birthdays', label: 'Birthdays', icon: Cake },
+            { id: 'news', label: 'News', icon: Newspaper },
+            { id: 'watchlist', label: 'Watchlist', icon: Clapperboard },
+            { id: 'cricket', label: 'Cricket', icon: cricketIcon },
+            { id: 'games', label: 'Games', icon: Gamepad2 },
+            { id: 'links', label: 'Quick Links', icon: Link2 },
+            { id: 'calculator', label: 'Calculator', icon: CalculatorIcon },
+            { id: 'converter', label: 'Converter', icon: Gauge },
+            { id: 'textcounter', label: 'Text Counter', icon: ScanText },
+            { id: 'timezone', label: 'Timezones', icon: CalendarClock },
+            { id: 'pdftools', label: 'PDF Tools', icon: FileText },
+            { id: 'findreplace', label: 'Find & Replace', icon: TextSearch },
+            { id: 'agecalculator', label: 'Age Calculator', icon: CalendarSearch },
+            { id: 'settings', label: 'Settings', icon: Settings },
+          ].map(item => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveView(item.id)}
+                className={`sidebar-nav-item w-full ${activeView === item.id ? 'active' : ''}`}
+              >
+                <Icon size={18} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+        <div className={`p-4 border-t border-gray-200 dark:border-gray-700`}>
           <div className="flex items-center gap-3">
             <button 
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className={`p-2 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+              onClick={toggleTheme}
+              className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}
             >
-              {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            <h1 className="text-xl font-bold">Daily Hub</h1>
-          </div>
-          
-          <div className="flex items-center gap-2">
             {isAuthenticated ? (
               <button 
-                onClick={handleLogout}
-                className={`p-2 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} flex items-center gap-2`}
+                onClick={() => setActiveView('account')}
+                className={`flex-1 p-2 rounded-lg ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} flex items-center gap-2`}
               >
-                <LogOut size={20} />
-                <span className="hidden md:inline">Logout</span>
+                <User size={18} />
+                <span className="text-sm truncate">{currentUser?.username || 'Account'}</span>
               </button>
             ) : (
               <button 
                 onClick={() => setShowAuthModal(true)}
-                className={`p-2 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} flex items-center gap-2`}
+                className="flex-1 p-2 bg-blue-500 text-white rounded-lg flex items-center justify-center gap-2 hover:bg-blue-600"
               >
-                <LogIn size={20} />
-                <span className="hidden md:inline">Login</span>
+                <LogIn size={18} />
+                <span className="text-sm">Sign In</span>
               </button>
             )}
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="main-content min-h-screen pb-20 lg:pb-4">
+        {/* Top App Bar - Android Style */}
+        <header className={`${cardBg} border-b ${borderColor} sticky top-0 z-40 backdrop-blur-md bg-opacity-95`}>
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setShowDrawer(true)}
+              className={`mobile-menu-btn p-2 rounded-full ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+            >
+              <Menu size={20} />
+            </button>
+            <h1 className="text-lg font-bold">Daily Hub</h1>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setShowGlobalSearch(!showGlobalSearch)}
+              className={`p-2 rounded-full ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+            >
+              <Search size={20} />
+            </button>
             <button 
               onClick={toggleTheme}
-              className={`p-2 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+              className={`p-2 rounded-full ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
             >
               {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
             </button>
+            {isAuthenticated ? (
+              <button 
+                onClick={() => setActiveView('account')}
+                className={`p-2 rounded-full ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+              >
+                <User size={20} />
+              </button>
+            ) : (
+              <button 
+                onClick={() => setShowAuthModal(true)}
+                className={`p-2 rounded-full ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+              >
+                <LogIn size={20} />
+              </button>
+            )}
           </div>
         </div>
+        {/* Global Search Bar */}
+        {showGlobalSearch && (
+          <div className="px-4 pb-3">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search tools (Tasks, Notes, Calculator, etc.)"
+                value={globalSearchQuery}
+                onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                className={`w-full px-4 py-2 rounded-xl ${cardBg} border ${borderColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              />
+              {globalSearchQuery && (
+                <div className={`absolute top-full left-0 right-0 mt-2 ${cardBg} border ${borderColor} rounded-xl shadow-xl max-h-64 overflow-y-auto z-50`}>
+                  {[
+                    { id: 'dashboard', label: 'Dashboard', icon: Home, keywords: ['home', 'main'] },
+                    { id: 'todos', label: 'Tasks', icon: CheckSquare, keywords: ['todo', 'task', 'checklist'] },
+                    { id: 'notes', label: 'Notes', icon: StickyNote, keywords: ['note', 'memo'] },
+                    { id: 'passwords', label: 'Passwords', icon: Key, keywords: ['password', 'vault', 'security'] },
+                    { id: 'watchlist', label: 'Watchlist', icon: Clapperboard, keywords: ['movie', 'tv', 'show', 'watch'] },
+                    { id: 'cricket', label: 'Cricket', icon: 'cricketIcon', keywords: ['cricket', 'score', 'sports'] },
+                    { id: 'news', label: 'News', icon: Newspaper, keywords: ['news', 'article'] },
+                    { id: 'birthdays', label: 'Birthdays', icon: Cake, keywords: ['birthday', 'celebration'] },
+                    { id: 'habits', label: 'Habits', icon: Goal, keywords: ['habit', 'track', 'goal'] },
+                    { id: 'expenses', label: 'Expenses', icon: HandCoins, keywords: ['expense', 'money', 'budget'] },
+                    { id: 'games', label: 'Games', icon: Gamepad2, keywords: ['game', 'play'] },
+                    { id: 'links', label: 'Quick Links', icon: Link2, keywords: ['link', 'bookmark'] },
+                    { id: 'calculator', label: 'Calculator', icon: CalculatorIcon, keywords: ['calc', 'math'] },
+                    { id: 'converter', label: 'Converter', icon: Gauge, keywords: ['convert', 'unit'] },
+                    { id: 'textcounter', label: 'Text Counter', icon: ScanText, keywords: ['text', 'count', 'word'] },
+                    { id: 'timezone', label: 'Timezone', icon: CalendarClock, keywords: ['time', 'zone', 'clock'] },
+                    { id: 'pdftools', label: 'PDF Tools', icon: FileText, keywords: ['pdf', 'document'] },
+                    { id: 'settings', label: 'Settings', icon: Settings, keywords: ['settings', 'preferences'] },
+                    { id: 'findreplace', label: 'Find & Replace', icon: TextSearch, keywords: ['find', 'replace', 'text'] },
+                    { id: 'agecalculator', label: 'Age Calculator', icon: CalendarSearch, keywords: ['age', 'calculator', 'birthdate'] },
+                  ]
+                    .filter(item => {
+                      const query = globalSearchQuery.toLowerCase();
+                      return item.label.toLowerCase().includes(query) || 
+                             item.keywords.some(k => k.includes(query));
+                    })
+                    .map(item => {
+                      const Icon = typeof item.icon === 'string' ? null : item.icon;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            setActiveView(item.id);
+                            setShowGlobalSearch(false);
+                            setGlobalSearchQuery('');
+                          }}
+                          className={`w-full flex items-center gap-3 px-4 py-3 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-colors`}
+                        >
+                          {Icon ? <Icon size={20} /> : <span className="text-xl">{item.icon}</span>}
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </header>
 
-      <div className="flex">
-        {/* Sidebar */}
-        {sidebarOpen && (
-          <aside className={`w-64 ${cardBg} border-r ${borderColor} min-h-screen p-4`}>
-            <nav className="space-y-1">
-              {navItems.map(item => {
-                const Icon = typeof item.icon === 'string' ? null : item.icon;
-                const isActive = activeView === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveView(item.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 ${
-                      isActive 
-                        ? theme === 'dark' ? 'bg-blue-600 text-white shadow-lg' : 'bg-blue-500 text-white shadow-lg'
-                        : theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-                    }`}
-                  >
-                    {Icon ? <Icon size={20} /> : <span className="text-lg">{item.icon}</span>}
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
-
-            <div className={`mt-8 pt-8 border-t ${borderColor}`}>
-              <button
-                onClick={() => setActiveView('settings')}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 ${
-                  activeView === 'settings'
-                    ? theme === 'dark' ? 'bg-blue-600 text-white shadow-lg' : 'bg-blue-500 text-white shadow-lg'
-                    : theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-                }`}
-              >
-                <Settings size={20} />
-                <span>Settings</span>
-              </button>
-            </div>
-          </aside>
-        )}
-
-        {/* Main Content */}
-        <main className="flex-1 p-6">
-          {/* Account View */}
-          {activeView === 'account' && isAuthenticated && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6">Account Details</h2>
-              
-              <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-4`}>
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center text-white text-3xl font-bold">
-                    {currentUser?.username?.[0]?.toUpperCase() || 'U'}
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-bold">{currentUser?.username || 'User'}</h3>
-                    <p className={textSecondary}>{currentUser?.email || 'No email'}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                    <p className={`text-sm ${textSecondary} mb-1`}>Username</p>
-                    <p className="font-semibold">{currentUser?.username || 'N/A'}</p>
-                  </div>
-                  <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                    <p className={`text-sm ${textSecondary} mb-1`}>Email</p>
-                    <p className="font-semibold">{currentUser?.email || 'N/A'}</p>
-                  </div>
-                  <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                    <p className={`text-sm ${textSecondary} mb-1`}>Account Created</p>
-                    <p className="font-semibold">
-                      {currentUser?.createdAt ? new Date(currentUser.createdAt).toLocaleDateString() : 'N/A'}
-                    </p>
-                  </div>
-                  <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                    <p className={`text-sm ${textSecondary} mb-1`}>Last Sync</p>
-                    <p className="font-semibold">
-                      {currentUser?.lastSync ? new Date(currentUser.lastSync).toLocaleString() : 'Never'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-4`}>
-                <h3 className="text-xl font-semibold mb-4">Data Summary</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-blue-500">{todos.length}</div>
-                    <p className={`text-sm ${textSecondary}`}>Tasks</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-green-500">{passwords.length}</div>
-                    <p className={`text-sm ${textSecondary}`}>Passwords</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-yellow-500">{notes.length}</div>
-                    <p className={`text-sm ${textSecondary}`}>Notes</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-purple-500">{birthdays.length}</div>
-                    <p className={`text-sm ${textSecondary}`}>Birthdays</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className={`${cardBg} p-6 rounded-xl border border-red-500`}>
-                <h3 className="text-xl font-semibold mb-4 text-red-500">Account Actions</h3>
-                <button 
-                  onClick={handleLogout}
-                  className="w-full px-4 py-3 bg-red-500 text-white rounded-lg transition-all duration-200 hover:bg-red-600 hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
-                >
-                  <LogOut size={20} />
-                  Logout from Account
+      {/* Side Drawer - Android Style */}
+      {showDrawer && (
+        <>
+          <div 
+            className="fixed inset-0 z-40"
+            onClick={() => setShowDrawer(false)}
+            style={{
+              backdropFilter: 'blur(1px)',
+              WebkitBackdropFilter: 'blur(1px)',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)'
+            }}
+          />
+          <div className={`fixed top-0 left-0 h-full w-72 ${cardBg} z-50 shadow-2xl transform transition-transform duration-300`}>
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold">Menu</h2>
+                <button onClick={() => setShowDrawer(false)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+                  <X size={20} />
                 </button>
               </div>
+              
+              <div className="space-y-1">
+                {[
+                  { id: 'news', label: 'News', icon: Newspaper },
+                  { id: 'birthdays', label: 'Birthdays', icon: Cake },
+                  { id: 'passwords', label: 'Passwords', icon: Key },
+                  { id: 'habits', label: 'Habits', icon: Goal },
+                  { id: 'expenses', label: 'Expenses', icon: HandCoins },
+                  { id: 'watchlist', label: 'Watchlist', icon: Clapperboard },
+                  { id: 'cricket', label: 'Cricket', icon: cricketIcon },
+                  { id: 'games', label: 'Games', icon: Gamepad2 },
+                  { id: 'links', label: 'Quick Links', icon: Link2 },
+                  { id: 'calculator', label: 'Calculator', icon: CalculatorIcon },
+                  { id: 'agecalculator', label: 'Age Calculator', icon: CalendarSearch },
+                  { id: 'converter', label: 'Converter', icon: Gauge },
+                  { id: 'textcounter', label: 'Text Counter', icon: ScanText },
+                  { id: 'timezone', label: 'Timezones', icon: CalendarClock },
+                  { id: 'pdftools', label: 'PDF Tools', icon: FileText },
+                  { id: 'findreplace', label: 'Find & Replace', icon: TextSearch },
+                  { id: 'settings', label: 'Settings', icon: Settings },
+                ].map(item => {
+                  const Icon = typeof item.icon === 'string' ? null : item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setActiveView(item.id);
+                        setShowDrawer(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl ${
+                        activeView === item.id 
+                          ? 'bg-blue-500 text-white' 
+                          : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      {Icon ? <Icon size={20} /> : <span className="text-lg">{item.icon}</span>}
+                      <span className="font-medium">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          )}
+          </div>
+        </>
+      )}
 
-          {/* Dashboard View */}
-          {activeView === 'dashboard' && (
-            <div>
-              <div className="mb-8">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-4xl">{greetingData?.icon}</span>
-                  <h2 className="text-4xl font-bold">{greetingData?.greeting}</h2>
+      {showWeatherDetail && weather && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
+          onClick={() => setShowWeatherDetail(false)}
+        >
+          <div
+            className={`${cardBg} relative p-6 rounded-3xl border ${borderColor} max-w-md w-full max-h-[90vh] overflow-visible shadow-2xl`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 blur-2xl rounded-3xl pointer-events-none"></div>
+            <div className="relative z-10 overflow-y-auto max-h-[80vh]">
+
+              {/* Header */}
+              <div className="relative z-10 flex justify-between items-start mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold">{weather.name}</h2>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className={`capitalize flex items-center gap-2 ${textSecondary}`}>
+                      <span className="text-xl animate-pulse-soft">
+                        {getWeatherDescription(weather.current.code, weather.current.is_day).icon}
+                      </span>
+                      {getWeatherDescription(weather.current.code, weather.current.is_day).description}
+                    </p>
+                  </div>
+
+                  {/* Temperature + range */}
+                  <div className="mt-2">
+                    <span className="text-5xl font-semibold">
+                      {weather.current.temp}
+                      <span className="text-2xl font-bold opacity-50">°C</span>
+                    </span>
+                    <p className="flex items-center gap-1 text-sm text-gray-400 mt-0.5">
+                      <span className="text-red-400">🌡️</span>
+                      Feels like {weather.current.feels_like}°C
+                    </p>
+                    <div className="flex items-center gap-2 mt-2 text-sm text-gray-400">
+                      <span className="text-blue-400 font-semibold">{weather.today.temp_min}°</span>
+                      <div className="w-12 h-1 bg-gradient-to-r from-blue-400 via-yellow-400 to-red-500 rounded-full"></div>
+                      <span className="text-red-500 font-semibold">{weather.today.temp_max}°</span>
+                      <span className="text-[11px] opacity-70 ml-1">Low → High</span>
+                    </div>
+                  </div>
                 </div>
-                {greetingData?.quote && (
-                  <p className={`text-lg ${textSecondary} italic`}>
-                  {greetingData?.quote}
-                  </p>
-                )}
-                <p className={`text-lg ${textSecondary}`}>Welcome back to your Daily Hub</p>
+
+                {/* Close button */}
+                <button
+                  onClick={() => setShowWeatherDetail(false)}
+                  className={`p-2 rounded-full ${theme === 'dark' ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100/70'} transition`}
+                >
+                  <X size={22} />
+                </button>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                {/* Clock Widget */}
-                <div className={`${cardBg} p-8 rounded-2xl border ${borderColor} shadow-lg`}>
-                  <p className={`${textSecondary} mb-2`}>{formatDate()}</p>
-                  <div className="text-6xl font-bold tracking-tight mb-1">
-                    {formatTime()}
-                  </div>
-                  <div className="flex gap-2 mt-4 flex-wrap">
-                    <div className={`px-3 py-1 rounded-lg ${theme === 'dark' ? 'bg-blue-600/20 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
-                      Week {Math.ceil((currentTime.getDate() + new Date(currentTime.getFullYear(), currentTime.getMonth(), 1).getDay()) / 7)}
-                    </div>
-                    <div className={`px-3 py-1 rounded-lg ${theme === 'dark' ? 'bg-purple-600/20 text-purple-400' : 'bg-purple-100 text-purple-600'}`}>
-                      Day {Math.floor((currentTime - new Date(currentTime.getFullYear(), 0, 0)) / 86400000)}
-                    </div>
-                    {getSpecialDaysForDate(currentTime).map((holiday, idx) => (
-                      <div key={idx} className={`px-3 py-1 rounded-lg ${theme === 'dark' ? 'bg-pink-600/20 text-pink-400' : 'bg-pink-100 text-pink-600'} flex items-center gap-1`}>
-                        <span>{holiday.emoji}</span>
-                        <span>{holiday.name}</span>
+              {/* Hourly Forecast */}
+              <div className={`relative z-10 my-4 p-4 rounded-xl border ${borderColor} bg-black/5`}>
+                <h3 className="font-semibold mb-2">Hourly Forecast</h3>
+                <div className="flex overflow-x-auto space-x-4 pb-2 scrollbar-thin scrollbar-thumb-gray-500/30">
+                  {weather.hourly.map((hour, index) => (
+                    <div
+                      key={index}
+                      className="flex-shrink-0 flex flex-col items-center gap-1 w-20 bg-white/5 p-2 rounded-lg hover:bg-white/10 transition"
+                    >
+                      <p className={`text-xs ${textSecondary}`}>{hour.time}</p>
+                      <p className="text-2xl">{hour.icon}</p>
+                      <p className="font-semibold">{hour.temp}°</p>
+                      <div className="flex items-center gap-1 text-xs text-blue-400">
+                        <Droplet size={12} />
+                        <span>{hour.precipitation_probability}%</span>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
+              </div>
 
-                {/* Weather Widget */}
-                <div className={`${cardBg} p-8 rounded-2xl border ${borderColor} shadow-lg`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-semibold">Weather</h3>
-                    <input
-                      type="text"
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          fetchWeather(city);
-                          localStorage.setItem('city', city);
-                        }
-                      }}
-                      className={`px-3 py-1 rounded-lg text-sm ${cardBg} border ${borderColor} w-32`}
-                      placeholder="Enter a city..."
-                    />
-                  </div>
-                  {weatherLoading ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-                    </div>
-                  ) : weather ? (
-                    <div>
-                      <div className="flex items-center gap-4 mb-4">
-                        <div className="text-6xl">
-                          {weather.weather?.[0]?.main === 'Clear' ? '☀️' :
-                          weather.weather?.[0]?.main === 'Clouds' ? '☁️' :
-                          weather.weather?.[0]?.main === 'Rain' ? '🌧️' :
-                          weather.weather?.[0]?.main === 'Snow' ? '❄️' :
-                          weather.weather?.[0]?.main === 'Thunderstorm' ? '⛈️' :
-                          '🌤️'}
-                        </div>
-                        <div>
-                          <div className="text-5xl font-bold">{Math.round(weather.main?.temp || 28)}°C</div>
-                          <p className={textSecondary}>Feels like {Math.round(weather.main?.feels_like || 30)}°C</p>
-                        </div>
+              {/* 7-Day Forecast */}
+              <div className={`relative z-10 my-4 p-4 rounded-xl border ${borderColor} bg-black/5`}>
+                <h3 className="font-semibold mb-2">7-Day Forecast</h3>
+                <div className="space-y-2">
+                  {weather.daily.map((day, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between hover:bg-white/5 rounded-lg p-2 transition"
+                    >
+                      <p className="font-medium w-1/4">
+                        {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}
+                      </p>
+                      <div className="flex items-center gap-2 w-1/4 justify-center">
+                        <span className="text-xl">{day.icon}</span>
+                        <span className="text-xs text-blue-400">{day.precipitation_probability}%</span>
                       </div>
-                      <p className="capitalize text-lg">{weather.weather?.[0]?.description || 'Clear sky'}</p>
-                      <p className={`${textSecondary} text-sm mt-1`}>{weather.name}</p>
+                      <div className="flex items-center justify-end gap-2 w-1/2 text-sm">
+                        <span className=" font-medium">{day.temp_min}° /</span>
+                        <span className=" font-medium">{day.temp_max}°</span>
+                      </div>
                     </div>
-                  ) : (
-                    <div className={textSecondary}>Weather data unavailable</div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Metrics Grid */}
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                {[
+                  { label: "Feels Like", value: `${weather.current.feels_like}°C`, icon: "🌡️" },
+                  { label: "Humidity", value: `${weather.current.humidity}%`, icon: "💧" },
+                  { label: "Wind Speed", value: `${weather.current.wind_speed} km/h`, icon: "🌬️" },
+                  {
+                    label: "Sunrise / Sunset",
+                    value: `${new Date(weather.today.sunrise).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} / ${new Date(weather.today.sunset).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`,
+                    icon: "🌅",
+                  },
+                ].map((metric, index) => (
+                  <div
+                    key={index}
+                    className={`p-4 rounded-2xl border ${borderColor} bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-pink-500/5 shadow-inner backdrop-blur-md flex flex-col items-start transition-all hover:shadow-lg hover:scale-[1.02]`}
+                  >
+                    <p className={`text-xs ${textSecondary}`}>
+                      {metric.label}
+                    </p>
+                    <p className="text-lg font-bold">
+                      {metric.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <main className="p-4 max-w-7xl mx-auto">
+        {/* Account View */}
+        {activeView === 'account' && isAuthenticated && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold mb-4">Account</h2>
+            
+            <div className={`${cardBg} p-6 rounded-2xl border ${borderColor}`}>
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                  {currentUser?.username?.[0]?.toUpperCase() || 'U'}
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">{currentUser?.username || 'User'}</h3>
+                  <p className={`text-sm ${textSecondary}`}>{currentUser?.email || 'No email'}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                  <p className={`text-xs ${textSecondary} mb-1`}>Tasks</p>
+                  <p className="text-2xl font-bold text-blue-500">{todos.length}</p>
+                </div>
+                <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                  <p className={`text-xs ${textSecondary} mb-1`}>Notes</p>
+                  <p className="text-2xl font-bold text-green-500">{notes.length}</p>
+                </div>
+                <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                  <p className={`text-xs ${textSecondary} mb-1`}>Passwords</p>
+                  <p className="text-2xl font-bold text-yellow-500">{passwords.length}</p>
+                </div>
+                <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                  <p className={`text-xs ${textSecondary} mb-1`}>Birthdays</p>
+                  <p className="text-2xl font-bold text-purple-500">{birthdays.length}</p>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              onClick={handleLogout}
+              className="w-full px-4 py-3 bg-red-500 text-white rounded-xl font-medium flex items-center justify-center gap-2"
+            >
+              <LogOut size={20} />
+              Logout
+            </button>
+          </div>
+        )}
+
+        {/* Dashboard View */}
+        {activeView === 'dashboard' && (
+          <div className="space-y-4">
+            {/* Greeting Card */}
+            <div className={`relative overflow-hidden ${cardBg} p-6 rounded-2xl border ${borderColor} shadow-lg`}>
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500/50 via-purple-500/50 to-pink-500/50 rounded-t-2xl"></div>
+              
+              <div className="absolute -top-4 -right-4 w-24 h-24 bg-blue-500/10 rounded-full blur-lg"></div>
+              <div className="absolute -bottom-8 -left-2 w-32 h-32 bg-purple-500/10 rounded-full blur-xl"></div>
+              
+              <div className="relative z-10 flex items-center gap-4">
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold">{greetingData?.greeting || 'Welcome!'}</h2>
+                  {greetingData?.quote && (
+                    <p className={`text-sm ${textSecondary} italic mt-1`}>
+                      "{greetingData.quote}"
+                    </p>
                   )}
                 </div>
               </div>
+            </div>
 
-              {/* Quick Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer`} onClick={() => setActiveView('todos')}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className={`text-xs ${textSecondary}`}>Tasks</h3>
-                    <CheckSquare className="text-blue-500" size={20} />
-                  </div>
-                  <p className="text-2xl font-bold">{stats.total}</p>
-                  <p className={`text-xs ${textSecondary} mt-1`}>
-                    {stats.active} active
-                  </p>
-                </div>
+            {/* Enhanced Time Card */}
+            <div className={`${cardBg} p-6 rounded-2xl border ${borderColor} shadow-lg`}>
+              {/* Main Date and Time */}
+              <p className={`text-sm ${textSecondary} mb-2`}>{formatDate()}</p>
+              <div className="text-4xl font-bold mb-4">{formatTime()}</div>
+
+              {/* Info Tags Section */}
+              <div className="flex gap-2 flex-wrap">
+                {(() => {
+                  // Helper calculations for day and week of year
+                  const startOfYear = new Date(currentTime.getFullYear(), 0, 1);
+                  const dayOfYear = Math.floor((currentTime - startOfYear) / (24 * 60 * 60 * 1000)) + 1;
+                  const weekOfYear = Math.ceil(dayOfYear / 7);
+                  const dayOfMonth = currentTime.getDate();
+                  const weekOfMonth = Math.ceil(dayOfMonth / 7);
+                  const nextNewYear = new Date(currentTime.getFullYear() + 1, 0, 1);
+                  const diffMs = nextNewYear.getTime() - currentTime.getTime();
+                  const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+                  return (
+                    <>
+                      {/* Week of the Year Tag */}
+                      <button
+                        onClick={() => setShowWeekOfMonth(!showWeekOfMonth)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 ${
+                          theme === 'dark' 
+                            ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/40' 
+                            : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                        }`}
+                      >
+                        {showWeekOfMonth
+                          ? `Week ${weekOfMonth} (Month)`
+                          : `Week ${weekOfYear} (Year)`
+                        }
+                      </button>
+
+                      {/* Day of the Year Tag */}
+                      <button
+                        onClick={() => setShowCountdown(!showCountdown)} // Toggle state on click
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 ${
+                          theme === 'dark' 
+                            ? 'bg-purple-600/20 text-purple-400 hover:bg-purple-600/40' 
+                            : 'bg-purple-100 text-purple-600 hover:bg-purple-200'
+                        }`}
+                      >
+                        {/* Conditionally show text based on state */}
+                        {showCountdown
+                          ? (
+                              daysRemaining === 1
+                                ? "New Year's Eve!"
+                                : `${daysRemaining} Days Left`
+                            )
+                          : `Day ${dayOfYear}`
+                        }
+                      </button>
+                    </>
+                  );
+                })()}
                 
-                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer`} onClick={() => setActiveView('passwords')}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className={`text-xs ${textSecondary}`}>Passwords</h3>
-                    <Key className="text-green-500" size={20} />
+                {/* Special Day Tags (e.g., Diwali) */}
+                {getSpecialDaysForDate(currentTime).map((holiday, idx) => (
+                  <div key={idx} className={`px-3 py-1 rounded-full text-xs font-medium ${theme === 'dark' ? 'bg-pink-600/20 text-pink-400' : 'bg-pink-100 text-pink-600'}`}>
+                    {holiday.emoji} {holiday.name} 
                   </div>
-                  <p className="text-2xl font-bold">{passwords.length}</p>
-                  <p className={`text-xs ${textSecondary} mt-1`}>Secured</p>
-                </div>
-                
-                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer`} onClick={() => setActiveView('notes')}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className={`text-xs ${textSecondary}`}>Notes</h3>
-                    <StickyNote className="text-yellow-500" size={20} />
-                  </div>
-                  <p className="text-2xl font-bold">{notes.length}</p>
-                  <p className={`text-xs ${textSecondary} mt-1`}>Saved</p>
-                </div>
+                ))}
+              </div>
+            </div>
 
-                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer`} onClick={() => setActiveView('birthdays')}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className={`text-xs ${textSecondary}`}>Birthdays</h3>
-                    <Cake className="text-pink-500" size={20} />
+            {/* "On This Day" Section */}
+            {(() => {
+              const onThisDayEvent = getOnThisDay()[0];
+              if (!onThisDayEvent) return null;
+
+              return (
+                <div className={`${cardBg} p-4 rounded-2xl border ${borderColor} shadow-lg`}>
+                  <div className="flex items-center gap-3">
+                    <DynamicCalendarIcon
+                      className="w-6 h-6 text-gray-400 flex-shrink-0"
+                      dateObject={currentTime}
+                    />
+                    <span className="text-sm font-medium text-indigo-500 dark:text-indigo-400 ">
+                      On This Day
+                    </span>
                   </div>
-                  <p className="text-2xl font-bold">{birthdays.length}</p>
-                  <p className={`text-xs ${textSecondary} mt-1`}>
-                    {getUpcomingBirthdays()[0] ? `${getUpcomingBirthdays()[0].daysUntil}d next` : 'None'}
+                  <div className="flex items-start gap-3 mt-2 pt-3.5 border-t border-gray-200 dark:border-gray-700/50">                           
+                    <p className={`font-medium text-sm leading-relaxed`}>
+                      {onThisDayEvent.event}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Weather Widget */}
+            <button
+              onClick={() => weather && setShowWeatherDetail(true)}
+              className={`relative overflow-hidden ${cardBg} p-5 rounded-3xl border ${borderColor} shadow-xl w-full text-left backdrop-blur-md transition-all hover:scale-[1.03] hover:shadow-2xl group`}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <div className="relative z-10 flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-xl font-bold tracking-wide">
+                    {weather ? weather.name : city}
+                  </h3>
+                  <p className={`text-sm ${textSecondary} capitalize flex items-center gap-2`}>
+                    {weatherLoading ? 'Loading...' : (
+                      <>
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                        {weather?.current.description}
+                      </>
+                    )}
                   </p>
                 </div>
-
-                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer`} onClick={() => setActiveView('habits')}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className={`text-xs ${textSecondary}`}>Habits</h3>
-                    <Goal className="text-purple-500" size={20} />
-                  </div>
-                  <p className="text-2xl font-bold">{habits.length}</p>
-                  <p className={`text-xs ${textSecondary} mt-1`}>Tracked</p>
-                </div>
-
-                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer`} onClick={() => setActiveView('expenses')}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className={`text-xs ${textSecondary}`}>Expenses</h3>
-                    <HandCoins className="text-orange-500" size={20} />
-                  </div>
-                  <p className="text-2xl font-bold">{expenses.length}</p>
-                  <p className={`text-xs ${textSecondary} mt-1`}>
-                    ₹{expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0).toFixed(0)}
-                  </p>
+                <div className="text-5xl">
+                  {weatherLoading ? (
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+                  ) : (
+                    <div className="text-5xl drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]">
+                    {weather?.current.icon}
+                    </div>
+                  )}
                 </div>
               </div>
-
-              {/* Upcoming Birthdays Widget */}
-              {birthdays.length > 0 && (
-                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-6`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-semibold flex items-center gap-2">
-                      <span>🎉</span>
-                      Upcoming Birthdays
-                    </h3>
-                    <button
-                      onClick={() => setActiveView('birthdays')}
-                      className="text-sm text-blue-500 hover:underline"
-                    >
-                      View all
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                    {getUpcomingBirthdays().map(birthday => (
-                      <div key={birthday.id} className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-purple-600/20' : 'bg-purple-50'} ${birthday.daysUntil === 0 ? 'ring-2 ring-purple-500' : ''}`}>
-                        <p className="font-semibold">{birthday.name}</p>
-                        <p className={`text-sm ${textSecondary}`}>
-                          {birthday.daysUntil === 0 ? '🎂 Today!' : 
-                          birthday.daysUntil === 1 ? '📅 Tomorrow' : 
-                          `📅 In ${birthday.daysUntil} days`}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
+              <div className="relative z-10 flex items-end justify-between mt-2">
+                <div>
+                  <span className="text-5xl font-semibold">
+                    {weatherLoading ? '--' : weather?.current.temp}
+                    <span className="text-2xl font-bold opacity-50">°C</span>
+                  </span>
+                  <p className="flex items-center gap-1 text-sm text-gray-400 mt-0.5">
+                    <span className="text-red-400">🌡️</span>
+                    Feels like {weatherLoading ? '--' : weather?.current.feels_like}°C
+                  </p>
                 </div>
-              )}
-
-              {/* On This Day Widget */}
-              {getOnThisDay().length > 0 && (
-                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-6`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-semibold flex items-center gap-2">
-                      <span>📅</span>
-                      On This Day
-                    </h3>
+                <div className="flex flex-col items-end text-sm text-gray-400">
+                  <div className="flex items-center gap-1">
+                    <span className="text-blue-400 font-semibold">
+                      {weatherLoading ? '--' : weather?.today.temp_min}°
+                    </span>
+                    <div className="w-10 h-1 bg-gradient-to-r from-blue-400 via-yellow-400 to-red-500 rounded-full"></div>
+                    <span className="text-red-500 font-semibold">
+                      {weatherLoading ? '--' : weather?.today.temp_max}°
+                    </span>
                   </div>
-                  <div className="space-y-2">
-                    {getOnThisDay().map((event, idx) => (
-                      <div key={idx} className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-indigo-600/20' : 'bg-indigo-50'}`}>
-                        <p className="font-medium">{event.event}</p>
-                      </div>
-                    ))}
-                  </div>
+                  <span className="text-[11px] mt-1 opacity-70">Low → High</span>
                 </div>
-              )}
+              </div>
+              <div className="relative z-10 mt-4 flex justify-between text-xs text-gray-400 border-t border-white/10 pt-2">
+                <span>Humidity: {weatherLoading ? '--' : weather?.current.humidity}%</span>
+                <span>Wind: {weatherLoading ? '--' : weather?.current.wind_speed} km/h</span>
+              </div>
+            </button>
+            
+            {/* Enhanced Quick Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: 'Tasks', count: stats.total, icon: CheckSquare, color: 'blue', view: 'todos' },
+                { label: 'Notes', count: notes.length, icon: StickyNote, color: 'yellow', view: 'notes' },
+                { label: 'Passwords', count: passwords.length, icon: Key, color: 'green', view: 'passwords' },
+                { label: 'Habits', count: habits.length, icon: Goal, color: 'purple', view: 'habits' },
+              ].map(item => (
+                <button
+                  key={item.label}
+                  onClick={() => setActiveView(item.view)}
+                  className={`${cardBg} p-4 rounded-2xl border ${borderColor} text-center shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95`}
+                >
+                  <item.icon className={`mx-auto mb-2 text-${item.color}-500`} size={24} />
+                  <p className="text-2xl font-bold">{item.count}</p>
+                  <p className={`text-xs ${textSecondary}`}>{item.label}</p>
+                </button>
+              ))}
+            </div>
 
-              {/* Upcoming Holidays Widget */}
-              <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-6`}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold flex items-center gap-2">
-                    <span>🎊</span>
-                    Upcoming Holidays
+            {/* Quick Actions */}
+            <div className={`${cardBg} p-4 rounded-2xl border ${borderColor} shadow-lg`}>
+              <h3 className="font-bold mb-3">Quick Actions</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {[
+                  { label: 'News', icon: Newspaper, view: 'news', color: 'purple' },
+                  { label: 'Expenses', icon: HandCoins, view: 'expenses', color: 'yellow' },
+                  { label: 'Games', icon: Gamepad2, view: 'games', color: 'pink' },
+                  { label: 'Watchlist', icon: Clapperboard, view: 'watchlist', color: 'blue' }
+                ].map(item => (
+                  <button
+                    key={item.label}
+                    onClick={() => setActiveView(item.view)}
+                    className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} transition-all hover:scale-105`}
+                  >
+                    <item.icon className={`mx-auto mb-1 text-${item.color}-500`} size={20} />
+                    <p className="text-xs font-medium">{item.label}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Recent Activity */}
+            <div className={`${cardBg} p-4 rounded-2xl border ${borderColor} shadow-lg`}>
+              <h3 className="font-bold mb-3">Recent Activity</h3>
+              <div className="space-y-2">
+                {todos.slice(0, 3).map(todo => (
+                  <div key={todo.id} className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} flex items-center gap-3`}>
+                    <CheckSquare size={16} className="text-blue-500" />
+                    <span className="text-sm flex-1 truncate">{todo.text}</span>
+                  </div>
+                ))}
+                {todos.length === 0 && (
+                  <p className={`text-sm ${textSecondary} text-center py-4`}>No recent tasks</p>
+                )}
+              </div>
+            </div>
+
+            {/* Upcoming Birthdays */}
+            {birthdays.length > 0 && (
+              <div className={`${cardBg} p-4 rounded-2xl border ${borderColor} shadow-lg`}>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold flex items-center gap-2">
+                    <Cake size={20} className="text-pink-500" />
+                    Upcoming Birthdays
                   </h3>
+                  <button onClick={() => setActiveView('birthdays')}>
+                    <ChevronRight size={20} className={textSecondary} />
+                  </button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                  {getUpcomingHolidays().map((holiday, idx) => (
-                    <div key={idx} className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-orange-600/20' : 'bg-orange-50'} ${holiday.daysUntil === 0 ? 'ring-2 ring-orange-500' : ''}`}>
-                      <div className="text-2xl mb-1">{holiday.emoji}</div>
-                      <p className="font-semibold text-sm">{holiday.name}</p>
+                <div className="space-y-2">
+                  {getUpcomingBirthdays().slice(0, 3).map(birthday => (
+                    <div key={birthday.id} className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-purple-600/20' : 'bg-purple-50'}`}>
+                      <p className="font-semibold">{birthday.name}</p>
+                      <p className={`text-xs ${textSecondary}`}>
+                        {birthday.daysUntil === 0 ? '🎂 Today!' : `In ${birthday.daysUntil} days`}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Upcoming Holidays */}
+            <div className={`${cardBg} p-4 rounded-2xl border ${borderColor} shadow-lg`}>
+              <h3 className="font-bold mb-3">Upcoming Holidays</h3>
+              <div className="space-y-2">
+                {getUpcomingHolidays().slice(0, 3).map((holiday, idx) => (
+                  <div key={idx} className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-orange-600/20' : 'bg-orange-50'}`}>
+                    <p className="font-semibold">{holiday.emoji} {holiday.name}</p>                
                       <p className={`text-xs ${textSecondary}`}>
                         {holiday.daysUntil === 0 ? 'Today!' : 
                         holiday.daysUntil === 1 ? 'Tomorrow' : 
                         `In ${holiday.daysUntil} days`}
                       </p>
-                    </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
+            </div>
+          </div>
+        )}
 
-              {/* Recent Activity */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                {/* Recent Tasks */}
-                <div className={`${cardBg} p-6 rounded-xl border ${borderColor}`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-semibold">Recent Tasks</h3>
-                    <button
-                      onClick={() => setActiveView('todos')}
-                      className="text-sm text-blue-500 hover:underline"
-                    >
-                      View all
-                    </button>
-                  </div>
-                  {todos.slice(0, 5).map(todo => (
-                    <div key={todo.id} className={`flex items-center gap-3 py-3 border-b ${borderColor} last:border-0`}>
-                      <input
-                        type="checkbox"
-                        checked={todo.completed}
-                        onChange={() => toggleTodo(todo.id)}
-                        className="w-4 h-4"
-                      />
-                      <span className={`flex-1 ${todo.completed ? 'line-through opacity-50' : ''}`}>
-                        {todo.text}
-                      </span>
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        todo.priority === 'high' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
-                        todo.priority === 'medium' ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                        'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                      }`}>
-                        {todo.priority}
-                      </span>
-                    </div>
-                  ))}
-                  {todos.length === 0 && (
-                    <div className={`text-center py-8 ${textSecondary}`}>
-                      <CheckSquare size={48} className="mx-auto mb-2 opacity-50" />
-                      <p>No tasks yet. Start adding tasks!</p>
-                    </div>
-                  )}
+        {/* Tasks View */}
+        {activeView === 'todos' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">🎯 Tasks</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setTodoFilter('all')}
+                  className={`px-3 py-1 rounded-full text-sm ${todoFilter === 'all' ? 'bg-blue-500 text-white' : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setTodoFilter('active')}
+                  className={`px-3 py-1 rounded-full text-sm ${todoFilter === 'active' ? 'bg-blue-500 text-white' : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}
+                >
+                  Active
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newTodo}
+                onChange={(e) => setNewTodo(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Add a new task..."
+                className={`flex-1 px-4 py-3 rounded-2xl ${cardBg} border ${borderColor}`}
+              />
+              <button
+                onClick={addTodo}
+                className="px-6 py-3 bg-blue-500 text-white rounded-2xl"
+              >
+                <Plus size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {filteredTodos.map(todo => (
+                <div key={todo.id} className={`${cardBg} p-4 rounded-2xl border ${borderColor} flex items-center gap-3`}>
+                  <input
+                    type="checkbox"
+                    checked={todo.completed}
+                    onChange={() => toggleTodo(todo.id)}
+                    className="w-5 h-5 rounded-full"
+                  />
+                  <span className={`flex-1 ${todo.completed ? 'line-through opacity-50' : ''}`}>
+                    {todo.text}
+                  </span>
+                  <button
+                    onClick={() => deleteTodo(todo.id)}
+                    className="text-red-500 p-2"
+                  >
+                    <Trash2 size={18} />
+                  </button>
                 </div>
+              ))}
+              {todos.length === 0 && (
+                <div className={`text-center py-8 ${textSecondary}`}>
+                  <CheckSquare size={48} className="mx-auto mb-2 opacity-50" />
+                  <p>No tasks yet. Create your first task!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
-                {/* Recent Notes */}
-                <div className={`${cardBg} p-6 rounded-xl border ${borderColor}`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-semibold">Recent Notes</h3>
-                    <button
-                      onClick={() => setActiveView('notes')}
-                      className="text-sm text-blue-500 hover:underline"
-                    >
-                      View all
-                    </button>
-                  </div>
-                  {notes.slice(0, 4).map(note => (
-                    <div key={note.id} className={`py-3 border-b ${borderColor} last:border-0`}>
-                      <h4 className="font-semibold mb-1">{note.title}</h4>
-                      <p className={`text-sm ${textSecondary} line-clamp-2`}>
-                        {note.content || 'No content'}
-                      </p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className={`px-2 py-1 rounded text-xs ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
-                          {note.category}
-                        </span>
-                        <span className={`text-xs ${textSecondary}`}>
-                          {new Date(note.updatedAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  {notes.length === 0 && (
+        {/* Notes View */}
+        {activeView === 'notes' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">📃 Notes</h2>
+              <button
+                onClick={() => setShowAddNote(!showAddNote)}
+                className="p-2 bg-blue-500 text-white rounded-full"
+              >
+                {showAddNote ? <X size={20} /> : <Plus size={20} />}
+              </button>
+            </div>
+
+            {showAddNote && (
+              <div className={`${cardBg} p-4 rounded-2xl border ${borderColor}`}>
+                <input
+                  type="text"
+                  placeholder="Title"
+                  value={currentNote.title}
+                  onChange={(e) => setCurrentNote({...currentNote, title: e.target.value})}
+                  className={`w-full px-4 py-3 rounded-xl ${cardBg} border ${borderColor} mb-3`}
+                />
+                <textarea
+                  placeholder="Content..."
+                  value={currentNote.content}
+                  onChange={(e) => setCurrentNote({...currentNote, content: e.target.value})}
+                  rows="6"
+                  className={`w-full px-4 py-3 rounded-xl ${cardBg} border ${borderColor} mb-3`}
+                />
+                <button
+                  onClick={addOrUpdateNote}
+                  className="w-full px-4 py-3 bg-blue-500 text-white rounded-xl font-medium"
+                >
+                  Save Note
+                </button>
+              </div>
+            )}
+            {notes.length === 0 && (
                     <div className={`text-center py-8 ${textSecondary}`}>
                       <StickyNote size={48} className="mx-auto mb-2 opacity-50" />
                       <p>No notes yet. Create your first note!</p>
                     </div>
                   )}
-                </div>
-              </div>
 
-              {/* Quick Actions */}
-              <div className={`${cardBg} p-6 rounded-xl border ${borderColor}`}>
-                <h3 className="text-xl font-semibold mb-4">Quick Actions</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                  <button
-                    onClick={() => setActiveView('todos')}
-                    className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-blue-600/20 hover:bg-blue-600/30' : 'bg-blue-50 hover:bg-blue-100'} transition-all duration-200 hover:scale-105 active:scale-95`}
-                  >
-                    <CheckSquare className="mx-auto mb-2 text-blue-500" size={24} />
-                    <p className="text-sm font-medium">Tasks</p>
-                  </button>
-                  <button
-                    onClick={() => setActiveView('passwords')}
-                    className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-green-600/20 hover:bg-green-600/30' : 'bg-green-50 hover:bg-green-100'} transition-all duration-200 hover:scale-105 active:scale-95`}
-                  >
-                    <Key className="mx-auto mb-2 text-green-500" size={24} />
-                    <p className="text-sm font-medium">Passwords</p>
-                  </button>
-                  <button
-                    onClick={() => setActiveView('notes')}
-                    className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-yellow-600/20 hover:bg-yellow-600/30' : 'bg-yellow-50 hover:bg-yellow-100'} transition-all duration-200 hover:scale-105 active:scale-95`}
-                  >
-                    <StickyNote className="mx-auto mb-2 text-yellow-500" size={24} />
-                    <p className="text-sm font-medium">Notes</p>
-                  </button>
-                  <button
-                    onClick={() => setActiveView('habits')}
-                    className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-purple-600/20 hover:bg-purple-600/30' : 'bg-purple-50 hover:bg-purple-100'} transition-all duration-200 hover:scale-105 active:scale-95`}
-                  >
-                    <Goal className="mx-auto mb-2 text-purple-500" size={24} />
-                    <p className="text-sm font-medium">Habits</p>
-                  </button>
-                  <button
-                    onClick={() => setActiveView('expenses')}
-                    className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-orange-600/20 hover:bg-orange-600/30' : 'bg-orange-50 hover:bg-orange-100'} transition-all duration-200 hover:scale-105 active:scale-95`}
-                  >
-                    <HandCoins className="mx-auto mb-2 text-orange-500" size={24} />
-                    <p className="text-sm font-medium">Expenses</p>
-                  </button>
-                  <button
-                    onClick={() => setActiveView('music')}
-                    className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-pink-600/20 hover:bg-pink-600/30' : 'bg-pink-50 hover:bg-pink-100'} transition-all duration-200 hover:scale-105 active:scale-95`}
-                  >
-                    <Music className="mx-auto mb-2 text-pink-500" size={24} />
-                    <p className="text-sm font-medium">Music</p>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Birthdays View */}
-          {activeView === 'birthdays' && (
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-3xl font-bold flex items-center gap-2">
-                  <span>🎂</span>
-                  Birthday Reminders
-                </h2>
-                <button
-                  onClick={() => setShowAddBirthday(!showAddBirthday)}
-                  className="px-4 py-2 bg-purple-500 text-white rounded-lg transition-all duration-200 hover:bg-purple-600 hover:scale-105 active:scale-95 flex items-center gap-2"
-                >
-                  <Plus size={20} />
-                  {showAddBirthday ? 'Cancel' : 'Add Birthday'}
-                </button>
-              </div>
-
-              {showAddBirthday && (
-                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-6`}>
-                  <h3 className="text-xl font-semibold mb-4">Add New Birthday</h3>
-                  <div className="space-y-3">
-                    <input
-                      type="text"
-                      placeholder="Name *"
-                      value={newBirthday.name}
-                      onChange={(e) => setNewBirthday({...newBirthday, name: e.target.value})}
-                      className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
-                    />
-                    <input
-                      type="date"
-                      value={newBirthday.date}
-                      onChange={(e) => setNewBirthday({...newBirthday, date: e.target.value})}
-                      className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
-                    />
-                    <select
-                      value={newBirthday.category}
-                      onChange={(e) => setNewBirthday({...newBirthday, category: e.target.value})}
-                      className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
-                    >
-                      <option value="family">Family</option>
-                      <option value="friend">Friend</option>
-                      <option value="colleague">Colleague</option>
-                      <option value="other">Other</option>
-                    </select>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={addBirthday}
-                        className="flex-1 px-4 py-3 bg-purple-500 text-white rounded-lg transition-all duration-200 hover:bg-purple-600 hover:scale-105 active:scale-95"
-                      >
-                        Save Birthday
-                      </button>
-                      <button
-                        onClick={() => setShowAddBirthday(false)}
-                        className="px-4 py-3 bg-gray-500 text-white rounded-lg transition-all duration-200 hover:bg-gray-600 hover:scale-105 active:scale-95"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {getUpcomingBirthdays().map(birthday => (
-                  <div key={birthday.id} className={`${cardBg} p-6 rounded-xl border ${borderColor} transition-all duration-200 hover:shadow-lg hover:scale-105 ${birthday.daysUntil === 0 ? 'ring-2 ring-purple-500' : ''}`}>
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h4 className="text-xl font-semibold">{birthday.name}</h4>
-                        <span className={`inline-block mt-1 px-2 py-1 text-xs rounded ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
-                          {birthday.category}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => deleteBirthday(birthday.id)}
-                        className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded transition-all duration-200"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                    <div className="text-3xl mb-2">
-                      {birthday.daysUntil === 0 ? '🎉' : 
-                       birthday.daysUntil <= 7 ? '🎂' : '📅'}
-                    </div>
-                    <p className="text-lg font-semibold">
-                      {birthday.daysUntil === 0 ? 'Today!' : 
-                       birthday.daysUntil === 1 ? 'Tomorrow' : 
-                       `In ${birthday.daysUntil} days`}
-                    </p>
-                    <p className={`text-sm ${textSecondary} mt-1`}>
-                      {new Date(birthday.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
-                    </p>
-                  </div>
-                ))}
-                {birthdays.length === 0 && (
-                  <div className={`${cardBg} p-8 rounded-xl border ${borderColor} text-center ${textSecondary} col-span-full`}>
-                    <span className="text-6xl mb-4 block">🎂</span>
-                    <p>No birthdays added yet. Add your first birthday reminder!</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Unit Converter View */}
-          {activeView === 'converter' && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6">Unit Converter</h2>
-              
-              <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-6`}>
-                <h3 className="text-xl font-semibold mb-4">Select Conversion Type</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                  {Object.keys(unitOptions).map(type => (
+            <div className="space-y-3">
+              {filteredNotes.map(note => (
+                <div key={note.id} className={`${cardBg} p-4 rounded-2xl border ${borderColor}`}>
+                  <h4 className="font-bold mb-2">{note.title}</h4>
+                  <p className={`text-sm ${textSecondary} mb-3 line-clamp-3`}>{note.content}</p>
+                  <div className="flex gap-2">
                     <button
-                      key={type}
-                      onClick={() => handleConverterTypeChange(type)}
-                      className={`px-4 py-3 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 ${
-                        converterType === type 
-                          ? 'bg-blue-500 text-white shadow-lg' 
-                          : theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'
-                      }`}
+                      onClick={() => editNote(note)}
+                      className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-xl text-sm"
                     >
-                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                      Edit
                     </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className={`${cardBg} p-8 rounded-xl border ${borderColor}`}>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* From Unit */}
-                  <div>
-                    <label className={`block mb-2 font-medium ${textSecondary}`}>From</label>
-                    <select
-                      value={fromUnit}
-                      onChange={(e) => {
-                        setFromUnit(e.target.value);
-                        if (inputValue) {
-                          const result = convertUnit(inputValue, e.target.value, toUnit, converterType);
-                          setOutputValue(result);
-                        }
-                      }}
-                      className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor} mb-3`}
-                    >
-                      {unitOptions[converterType].map(unit => (
-                        <option key={unit} value={unit}>
-                          {unit.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="number"
-                      value={inputValue}
-                      onChange={(e) => handleConvert(e.target.value)}
-                      placeholder="Enter value"
-                      className={`w-full px-4 py-4 rounded-lg ${cardBg} border ${borderColor} text-2xl`}
-                    />
-                  </div>
-
-                  {/* Swap Button */}
-                  <div className="hidden lg:flex items-center justify-center">
                     <button
-                      onClick={swapUnits}
-                      className={`p-4 rounded-full transition-all duration-200 hover:scale-110 active:scale-95 ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}
-                    >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  {/* To Unit */}
-                  <div>
-                    <label className={`block mb-2 font-medium ${textSecondary}`}>To</label>
-                    <select
-                      value={toUnit}
-                      onChange={(e) => {
-                        setToUnit(e.target.value);
-                        if (inputValue) {
-                          const result = convertUnit(inputValue, fromUnit, e.target.value, converterType);
-                          setOutputValue(result);
-                        }
-                      }}
-                      className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor} mb-3`}
-                    >
-                      {unitOptions[converterType].map(unit => (
-                        <option key={unit} value={unit}>
-                          {unit.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        </option>
-                      ))}
-                    </select>
-                    <div className={`w-full px-4 py-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'} border ${borderColor} text-2xl font-semibold ${outputValue ? 'text-blue-500' : textSecondary}`}>
-                      {outputValue || '0'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Mobile Swap Button */}
-                <div className="lg:hidden mt-4">
-                  <button
-                    onClick={swapUnits}
-                    className={`w-full px-4 py-3 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center gap-2 ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                    </svg>
-                    Swap Units
-                  </button>
-                </div>
-
-                {/* Quick Conversions */}
-                {inputValue && (
-                  <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                    <h4 className="font-semibold mb-3">Quick Conversions from {inputValue} {fromUnit.replace(/_/g, ' ')}:</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {unitOptions[converterType].filter(unit => unit !== fromUnit).slice(0, 8).map(unit => (
-                        <div key={unit} className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
-                          <p className={`text-xs ${textSecondary} mb-1`}>
-                            {unit.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                          </p>
-                          <p className="font-semibold">
-                            {convertUnit(inputValue, fromUnit, unit, converterType)}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Common Conversions Reference */}
-              <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mt-6`}>
-                <h3 className="text-xl font-semibold mb-4">Common Conversions Reference</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <h4 className="font-semibold mb-2 text-blue-500">Length</h4>
-                    <ul className={`text-sm ${textSecondary} space-y-1`}>
-                      <li>1 km = 1000 m</li>
-                      <li>1 mile = 1.609 km</li>
-                      <li>1 foot = 30.48 cm</li>
-                      <li>1 inch = 2.54 cm</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-2 text-green-500">Weight</h4>
-                    <ul className={`text-sm ${textSecondary} space-y-1`}>
-                      <li>1 kg = 1000 g</li>
-                      <li>1 kg = 2.205 lb</li>
-                      <li>1 lb = 16 oz</li>
-                      <li>1 ton = 1000 kg</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-2 text-orange-500">Temperature</h4>
-                    <ul className={`text-sm ${textSecondary} space-y-1`}>
-                      <li>0°C = 32°F</li>
-                      <li>100°C = 212°F</li>
-                      <li>0 K = -273.15°C</li>
-                      <li>°F = (°C × 9/5) + 32</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-2 text-purple-500">Volume</h4>
-                    <ul className={`text-sm ${textSecondary} space-y-1`}>
-                      <li>1 L = 1000 mL</li>
-                      <li>1 gallon = 3.785 L</li>
-                      <li>1 cup = 236.6 mL</li>
-                      <li>1 fl oz = 29.57 mL</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-2 text-pink-500">Area</h4>
-                    <ul className={`text-sm ${textSecondary} space-y-1`}>
-                      <li>1 km² = 100 hectares</li>
-                      <li>1 acre = 4047 m²</li>
-                      <li>1 hectare = 10000 m²</li>
-                      <li>1 m² = 10.76 ft²</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-2 text-cyan-500">Speed</h4>
-                    <ul className={`text-sm ${textSecondary} space-y-1`}>
-                      <li>1 m/s = 3.6 km/h</li>
-                      <li>1 mph = 1.609 km/h</li>
-                      <li>1 knot = 1.852 km/h</li>
-                      <li>1 km/h = 0.621 mph</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Habits View */}
-          {activeView === 'habits' && (
-            <HabitTracker 
-              theme={theme} 
-              habits={habits}
-              setHabits={setHabits}
-              showToast={showToast}
-            />
-          )}
-
-          {/* Expenses View */}
-          {activeView === 'expenses' && (
-            <ExpenseTracker 
-              theme={theme}
-              expenses={expenses}
-              setExpenses={setExpenses}
-              showToast={showToast}
-            />
-          )}
-
-          {/* Text Counter View */}
-          {activeView === 'textcounter' && (
-            <TextCounter 
-              theme={theme}
-              showToast={showToast}
-            />
-          )}
-
-          {/* Cricket Scoreboard View */}
-          {activeView === 'cricket' && (
-            <CricketScoreboard 
-              theme={theme}
-              showToast={showToast}
-            />
-          )}
-
-          {/* News Feed View */}
-          {activeView === 'news' && (
-            <NewsFeed 
-              theme={theme}
-              showToast={showToast}
-            />
-          )}
-
-          {/* Time Zone View */}
-          {activeView === 'timezone' && (
-            <TimeZoneConverter 
-              theme={theme}
-              showToast={showToast}
-            />
-          )}
-          
-          {/* Tasks View */}
-          {activeView === 'todos' && (
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-3xl font-bold">Tasks</h2>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setTodoFilter('all')}
-                    className={`px-4 py-2 rounded-lg ${todoFilter === 'all' ? 'bg-blue-500 text-white' : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}
-                  >
-                    All ({stats.total})
-                  </button>
-                  <button
-                    onClick={() => setTodoFilter('active')}
-                    className={`px-4 py-2 rounded-lg ${todoFilter === 'active' ? 'bg-blue-500 text-white' : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}
-                  >
-                    Active ({stats.active})
-                  </button>
-                  <button
-                    onClick={() => setTodoFilter('completed')}
-                    className={`px-4 py-2 rounded-lg ${todoFilter === 'completed' ? 'bg-blue-500 text-white' : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}
-                  >
-                    Completed ({stats.completed})
-                  </button>
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newTodo}
-                    onChange={(e) => setNewTodo(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="Add a new task..."
-                    className={`flex-1 px-4 py-3 rounded-lg ${cardBg} border ${borderColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                  />
-                  <button
-                    onClick={addTodo}
-                    className="px-6 py-3 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95 hover:shadow-lg flex items-center gap-2"
-                  >
-                    <Plus size={20} />
-                    Add
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {filteredTodos.map(todo => (
-                  <div key={todo.id} className={`${cardBg} p-4 rounded-lg border ${borderColor} flex items-center gap-3`}>
-                    <input
-                      type="checkbox"
-                      checked={todo.completed}
-                      onChange={() => toggleTodo(todo.id)}
-                      className="w-5 h-5"
-                    />
-                    <span className={`flex-1 ${todo.completed ? 'line-through opacity-50' : ''}`}>
-                      {todo.text}
-                    </span>
-                    <select
-                      value={todo.priority}
-                      onChange={(e) => updateTodoPriority(todo.id, e.target.value)}
-                      className={`px-3 py-1 rounded ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} border ${borderColor}`}
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                    </select>
-                    <button
-                      onClick={() => deleteTodo(todo.id)}
-                      className="px-3 py-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                      onClick={() => deleteNote(note.id)}
+                      className="px-3 py-2 text-red-500 border border-red-500 rounded-xl text-sm"
                     >
                       Delete
                     </button>
                   </div>
-                ))}
-                {filteredTodos.length === 0 && (
-                  <div className={`${cardBg} p-8 rounded-lg border ${borderColor} text-center ${textSecondary}`}>
-                    No tasks found
-                  </div>
-                )}
-              </div>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Password Manager */}
-          {activeView === 'passwords' && (
-            <div>
-              {!masterPasswordSet ? (
-                <div className="max-w-md mx-auto mt-20">
-                  <div className={`${cardBg} p-8 rounded-xl border ${borderColor}`}>
-                    <Key size={48} className="mx-auto mb-4 text-blue-500" />
-                    <h2 className="text-2xl font-bold mb-2 text-center">Setup Master Password</h2>
-                    <p className={`${textSecondary} mb-6 text-center`}>
-                      Create a master password to secure your password vault.
-                    </p>
+        {/* Birthdays View */}
+        {activeView === 'birthdays' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">🎂 Birthdays</h2>
+              <button
+                onClick={() => setShowAddBirthday(!showAddBirthday)}
+                className="p-2 bg-purple-500 text-white rounded-full"
+              >
+                {showAddBirthday ? <X size={20} /> : <Plus size={20} />}
+              </button>
+            </div>
+
+            {showAddBirthday && (
+              <div className={`${cardBg} p-4 rounded-2xl border ${borderColor} space-y-3`}>
+                <input
+                  type="text"
+                  placeholder="Name"
+                  value={newBirthday.name}
+                  onChange={(e) => setNewBirthday({...newBirthday, name: e.target.value})}
+                  className={`w-full px-4 py-3 rounded-xl ${cardBg} border ${borderColor}`}
+                />
+                <input
+                  type="date"
+                  value={newBirthday.date}
+                  onChange={(e) => setNewBirthday({...newBirthday, date: e.target.value})}
+                  className={`w-full px-4 py-3 rounded-xl ${cardBg} border ${borderColor}`}
+                />
+                <button
+                  onClick={addBirthday}
+                  className="w-full px-4 py-3 bg-purple-500 text-white rounded-xl font-medium"
+                >
+                  Save Birthday
+                </button>
+              </div>
+            )}
+            {birthdays.length === 0 && (
+              <div className={`text-center py-8 ${textSecondary}`}>
+                <Cake size={48} className="mx-auto mb-2 opacity-50" />
+                <p>No birthdays yet. Create your first birthday reminder!</p>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {getUpcomingBirthdays().map(birthday => (
+                <div key={birthday.id} className={`${cardBg} p-4 rounded-2xl border ${borderColor}`}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="font-bold">{birthday.name}</h4>
+                      <p className={`text-sm ${textSecondary}`}>
+                        {birthday.daysUntil === 0 ? '🎂 Today!' : `In ${birthday.daysUntil} days`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => deleteBirthday(birthday.id)}
+                      className="text-red-500 p-2"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Password Manager */}
+        {activeView === 'passwords' && (
+          <div>
+            {!masterPasswordSet ? (
+              <div className="max-w-md mx-auto mt-8">
+                <div className={`${cardBg} p-6 rounded-2xl border ${borderColor}`}>
+                  <Key size={48} className="mx-auto mb-4 text-blue-500" />
+                  <h2 className="text-xl font-bold mb-4 text-center">Setup Master Password</h2>
+                  <input
+                    type="password"
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    placeholder="Master password (min 6 chars)"
+                    className={`w-full px-4 py-3 rounded-xl ${cardBg} border ${borderColor} mb-3`}
+                  />
+                  
+                  <select
+                    value={recoveryQuestion}
+                    onChange={(e) => setRecoveryQuestion(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl ${cardBg} border ${borderColor} mb-2`}
+                  >
+                    <option value="">Select recovery question</option>
+                    <option value="pet">What is your first pet's name?</option>
+                    <option value="city">In which city were you born?</option>
+                    <option value="teacher">What is your favorite teacher's name?</option>
+                    <option value="food">What is your favorite food?</option>
+                    <option value="book">What is your favorite book?</option>
+                  </select>
+                  <input
+                    type="text"
+                    value={recoveryAnswer}
+                    onChange={(e) => setRecoveryAnswer(e.target.value)}
+                    placeholder="Answer"
+                    className={`w-full px-4 py-3 rounded-xl ${cardBg} border ${borderColor} mb-4`}
+                  />
+
+                  <button
+                    onClick={setupMasterPassword}
+                    className="w-full px-4 py-3 bg-blue-500 text-white rounded-xl font-medium"
+                  >
+                    Create Password
+                  </button>
+                </div>
+              </div>
+            ) : !isUnlocked ? (
+              <div className="max-w-md mx-auto px-4 py-8">
+                <div className={`${cardBg} p-6 rounded-3xl border ${borderColor} shadow-xl`}>
+                  <div className="text-center mb-6">
+                    <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Lock size={40} className="text-blue-500" />
+                    </div>
+                    <h2 className="text-2xl font-bold mb-2">Unlock Vault</h2>
+                    <p className={`text-sm ${textSecondary}`}>Enter your master password</p>
+                  </div>
+
+                  <div className="space-y-4">
                     <input
                       type="password"
                       value={passwordInput}
                       onChange={(e) => setPasswordInput(e.target.value)}
-                      placeholder="Enter master password (min 6 characters)"
-                      className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor} focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4`}
+                      onKeyPress={(e) => e.key === 'Enter' && unlockVault()}
+                      placeholder="Master password"
+                      className={`w-full px-4 py-3 rounded-xl ${cardBg} border ${borderColor} text-base focus:ring-2 focus:ring-blue-500 focus:outline-none`}
                     />
-                    
-                    <div className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'} p-4 rounded-lg mb-4`}>
-                      <p className="font-semibold mb-2">Recovery Setup</p>
-                      <p className={`text-sm ${textSecondary} mb-3`}>Set up a recovery question</p>
-                      <select
-                        value={recoveryQuestion}
-                        onChange={(e) => setRecoveryQuestion(e.target.value)}
-                        className={`w-full px-4 py-2 rounded-lg ${cardBg} border ${borderColor} mb-2`}
-                      >
-                        <option value="">Select a recovery question</option>
-                        <option value="pet">What is your first pet's name?</option>
-                        <option value="city">In which city were you born?</option>
-                        <option value="teacher">What is your favorite teacher's name?</option>
-                        <option value="food">What is your favorite food?</option>
-                        <option value="book">What is your favorite book?</option>
-                      </select>
-                      <input
-                        type="text"
-                        value={recoveryAnswer}
-                        onChange={(e) => setRecoveryAnswer(e.target.value)}
-                        placeholder="Your answer"
-                        className={`w-full px-4 py-2 rounded-lg ${cardBg} border ${borderColor}`}
-                      />
-                    </div>
-
                     <button
-                      onClick={setupMasterPassword}
-                      className="w-full px-6 py-3 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95"
+                      onClick={unlockVault}
+                      className="w-full px-4 py-3.5 bg-blue-500 text-white rounded-xl font-semibold text-base active:scale-95 transition-transform"
                     >
-                      Create Master Password
+                      Unlock
                     </button>
                   </div>
                 </div>
-              ) : !isUnlocked ? (
-                <div className="max-w-md mx-auto mt-20">
-                  <div className={`${cardBg} p-8 rounded-xl border ${borderColor}`}>
-                    <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Key size={32} className="text-white" />
-                    </div>
-                    <h2 className="text-2xl font-bold mb-2 text-center">Unlock Password Vault</h2>
-                    
-                    {!showRecovery ? (
-                      <div>
-                        <input
-                          type="password"
-                          value={passwordInput}
-                          onChange={(e) => setPasswordInput(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && unlockVault()}
-                          placeholder="Enter master password"
-                          className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor} mb-4`}
-                        />
-                        <button
-                          onClick={unlockVault}
-                          className="w-full px-6 py-3 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95 mb-2"
-                        >
-                          Unlock Vault
-                        </button>
-                        <button
-                          onClick={() => setShowRecovery(true)}
-                          className={`w-full px-4 py-2 ${textSecondary} hover:${textColor} transition-all duration-200`}
-                        >
-                          Forgot password?
-                        </button>
-                      </div>
-                    ) : (
-                      <div className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-yellow-50'} p-4 rounded-lg`}>
-                        <p className="font-semibold mb-2">Password Recovery</p>
-                        <p className="mb-3">
-                          {recoveryQuestion === 'pet' ? "What is your first pet's name?" :
-                           recoveryQuestion === 'city' ? "In which city were you born?" :
-                           recoveryQuestion === 'teacher' ? "What is your favorite teacher's name?" :
-                           recoveryQuestion === 'food' ? "What is your favorite food?" :
-                           "What is your favorite book?"}
-                        </p>
-                        <input
-                          type="text"
-                          placeholder="Your answer"
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter') {
-                              recoverPassword(e.target.value);
-                              e.target.value = '';
-                            }
-                          }}
-                          className={`w-full px-4 py-2 rounded-lg ${cardBg} border ${borderColor} mb-2`}
-                        />
-                        <button
-                          onClick={() => setShowRecovery(false)}
-                          className={`w-full px-4 py-2 ${textSecondary} hover:${textColor}`}
-                        >
-                          Back to login
-                        </button>
-                      </div>
-                    )}
-                  </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-2">
+                    <h2 className="text-2xl font-bold">🔑 Password Manager</h2> 
+                  </div> 
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowGenerator(!showGenerator)}
+                      className="px-4 py-2 bg-green-500 text-white rounded-lg transition-all duration-200 hover:bg-green-600 hover:scale-105 active:scale-95"
+                    >
+                      Generator
+                    </button>
+                    <button
+                      onClick={() => setShowAddPassword(!showAddPassword)}
+                      className="p-2 bg-green-500 text-white rounded-full transition-all duration-200 hover:bg-green-600 active:scale-95"
+                    >
+                      <Plus size={20} />
+                    </button>
+                  </div>  
                 </div>
-              ) : (
-                <div>
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-3xl font-bold">Password Manager</h2>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setShowGenerator(!showGenerator)}
-                        className="px-4 py-2 bg-green-500 text-white rounded-lg transition-all duration-200 hover:bg-green-600 hover:scale-105 active:scale-95"
-                      >
-                        Generator
-                      </button>
-                      <button
-                        onClick={() => setShowAddPassword(!showAddPassword)}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95 flex items-center gap-2"
-                      >
-                        <Plus size={20} />
-                        Add
-                      </button>
-                      <button
-                        onClick={lockVault}
-                        className="px-4 py-2 bg-red-500 text-white rounded-lg transition-all duration-200 hover:bg-red-600 hover:scale-105 active:scale-95 flex items-center gap-2"
-                      >
-                        <Lock size={20} />
-                        Lock
-                      </button>
-                    </div>
-                  </div>
-
-                  {showGenerator && (
-                    <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-6`}>
-                      <h3 className="text-xl font-semibold mb-4">Password Generator</h3>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block mb-2">Length: {passwordLength}</label>
-                          <input
-                            type="range"
-                            min="6"
-                            max="32"
-                            value={passwordLength}
-                            onChange={(e) => setPasswordLength(parseInt(e.target.value))}
-                            className="w-full"
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={includeUppercase}
-                              onChange={(e) => setIncludeUppercase(e.target.checked)}
-                            />
-                            Uppercase (A-Z)
-                          </label>
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={includeLowercase}
-                              onChange={(e) => setIncludeLowercase(e.target.checked)}
-                            />
-                            Lowercase (a-z)
-                          </label>
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={includeNumbers}
-                              onChange={(e) => setIncludeNumbers(e.target.checked)}
-                            />
-                            Numbers (0-9)
-                          </label>
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={includeSymbols}
-                              onChange={(e) => setIncludeSymbols(e.target.checked)}
-                            />
-                            Symbols (!@#$...)
-                          </label>
-                        </div>
-                        <button
-                          onClick={generatePassword}
-                          className="w-full px-4 py-3 bg-green-500 text-white rounded-lg transition-all duration-200 hover:bg-green-600 hover:scale-105 active:scale-95"
-                        >
-                          Generate Password
-                        </button>
-                        {generatedPassword && (
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={generatedPassword}
-                              readOnly
-                              className={`flex-1 px-4 py-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} border ${borderColor}`}
-                            />
-                            <button
-                              onClick={() => copyToClipboard(generatedPassword)}
-                              className="px-4 py-3 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95"
-                            >
-                              Copy
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                {passwords.length === 0 && (
+                    <div className={`text-center py-8 ${textSecondary}`}>
+                      <Key size={48} className="mx-auto mb-2 opacity-50" />
+                      <p>No passwords yet. Add your first password!</p>
                     </div>
                   )}
 
-                  {showAddPassword && (
-                    <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-6`}>
-                      <h3 className="text-xl font-semibold mb-4">Add New Password</h3>
-                      <div className="space-y-3">
+                {showGenerator && (
+                  <div className={`${cardBg} p-4 rounded-2xl border ${borderColor} shadow-lg`}>
+                    <h3 className="text-lg font-bold mb-4">Password Generator</h3>
+                    
+                    <div className="space-y-4">
+                      {/* Length Slider */}
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <label className="text-sm font-medium">Length</label>
+                          <span className="text-sm font-bold text-blue-500">{passwordLength}</span>
+                        </div>
                         <input
-                          type="text"
-                          placeholder="Title *"
-                          value={newPasswordEntry.title}
-                          onChange={(e) => setNewPasswordEntry({...newPasswordEntry, title: e.target.value})}
-                          className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
+                          type="range"
+                          min="6"
+                          max="32"
+                          value={passwordLength}
+                          onChange={(e) => setPasswordLength(parseInt(e.target.value))}
+                          className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-500"
                         />
-                        <input
-                          type="text"
-                          placeholder="Username / Email"
-                          value={newPasswordEntry.username}
-                          onChange={(e) => setNewPasswordEntry({...newPasswordEntry, username: e.target.value})}
-                          className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
-                        />
-                        <div className="flex gap-2">
+                      </div>
+
+                      {/* Options Grid */}
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { label: 'A-Z', checked: includeUppercase, setter: setIncludeUppercase },
+                          { label: 'a-z', checked: includeLowercase, setter: setIncludeLowercase },
+                          { label: '0-9', checked: includeNumbers, setter: setIncludeNumbers },
+                          { label: '!@#', checked: includeSymbols, setter: setIncludeSymbols },
+                        ].map((option, idx) => (
+                          <label key={idx} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={option.checked}
+                              onChange={(e) => option.setter(e.target.checked)}
+                              className="w-4 h-4 accent-blue-500"
+                            />
+                            <span className="text-sm font-medium">{option.label}</span>
+                          </label>
+                        ))}
+                      </div>
+
+                      {/* Generate Button */}
+                      <button
+                        onClick={generatePassword}
+                        className="w-full px-4 py-3 bg-green-500 text-white rounded-xl font-semibold active:scale-95 transition-all"
+                      >
+                        Generate Password
+                      </button>
+
+                      {/* Generated Password Display */}
+                      {generatedPassword && (
+                        <div className={`flex gap-2 p-3 rounded-xl ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
                           <input
                             type="text"
-                            placeholder="Password *"
-                            value={newPasswordEntry.password}
-                            onChange={(e) => setNewPasswordEntry({...newPasswordEntry, password: e.target.value})}
-                            className={`flex-1 px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
+                            value={generatedPassword}
+                            readOnly
+                            className="flex-1 bg-transparent text-sm focus:outline-none"
                           />
                           <button
-                            onClick={() => {
-                              if (generatedPassword) {
-                                setNewPasswordEntry({...newPasswordEntry, password: generatedPassword});
-                              }
-                            }}
-                            className="px-4 py-3 bg-gray-500 text-white rounded-lg transition-all duration-200 hover:bg-gray-600 hover:scale-105 active:scale-95"
+                            onClick={() => copyToClipboard(generatedPassword)}
+                            className="p-2 bg-blue-500 text-white rounded-lg active:scale-95 transition-all"
                           >
-                            Use Generated
+                            <Copy size={18} />
                           </button>
                         </div>
-                        <input
-                          type="url"
-                          placeholder="Website URL"
-                          value={newPasswordEntry.url}
-                          onChange={(e) => setNewPasswordEntry({...newPasswordEntry, url: e.target.value})}
-                          className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
-                        />
-                        <select
-                          value={newPasswordEntry.category}
-                          onChange={(e) => setNewPasswordEntry({...newPasswordEntry, category: e.target.value})}
-                          className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
-                        >
-                          {categories.map(cat => (
-                            <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
-                          ))}
-                        </select>
-                        <textarea
-                          placeholder="Notes (optional)"
-                          value={newPasswordEntry.notes}
-                          onChange={(e) => setNewPasswordEntry({...newPasswordEntry, notes: e.target.value})}
-                          rows="3"
-                          className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={addPasswordEntry}
-                            className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95"
-                          >
-                            Save Password
-                          </button>
-                          <button
-                            onClick={() => setShowAddPassword(false)}
-                            className="px-4 py-3 bg-gray-500 text-white rounded-lg transition-all duration-200 hover:bg-gray-600 hover:scale-105 active:scale-95"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
+                      )}
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  <div className="flex gap-2 mb-6">
+                {showAddPassword && (
+                  <div className={`${cardBg} p-4 rounded-2xl border ${borderColor} space-y-3`}>
                     <input
                       type="text"
-                      placeholder="Search passwords..."
-                      value={searchPassword}
-                      onChange={(e) => setSearchPassword(e.target.value)}
-                      className={`flex-1 px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
+                      placeholder="Title"
+                      value={newPasswordEntry.title}
+                      onChange={(e) => setNewPasswordEntry({...newPasswordEntry, title: e.target.value})}
+                      className={`w-full px-4 py-3 rounded-xl ${cardBg} border ${borderColor}`}
                     />
-                    <select
-                      value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value)}
-                      className={`px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
+                    <input
+                      type="text"
+                      placeholder="Password"
+                      value={newPasswordEntry.password}
+                      onChange={(e) => setNewPasswordEntry({...newPasswordEntry, password: e.target.value})}
+                      className={`w-full px-4 py-3 rounded-xl ${cardBg} border ${borderColor}`}
+                    />
+                    <button
+                      onClick={addPasswordEntry}
+                      className="w-full px-4 py-3 bg-green-500 text-white rounded-xl font-medium"
                     >
-                      <option value="all">All Categories</option>
-                      {categories.map(cat => (
-                        <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
-                      ))}
-                    </select>
+                      Save
+                    </button>
                   </div>
+                )}
 
-                  <div className="space-y-3">
-                    {filteredPasswords.length === 0 ? (
-                      <div className={`${cardBg} p-8 rounded-xl border ${borderColor} text-center ${textSecondary}`}>
-                        No passwords found. Add your first password!
-                      </div>
-                    ) : (
-                      filteredPasswords.map(pwd => (
-                        <div key={pwd.id} className={`${cardBg} p-4 rounded-xl border ${borderColor}`}>
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">
-                              <h4 className="text-lg font-semibold">{pwd.title}</h4>
-                              {pwd.username && <p className={textSecondary}>{pwd.username}</p>}
-                              {pwd.url && (
-                                <a href={pwd.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 text-sm hover:underline">
-                                  {pwd.url}
-                                </a>
-                              )}
-                              <span className={`inline-block mt-2 px-2 py-1 text-xs rounded ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
-                                {pwd.category}
-                              </span>
-                            </div>
+                <div className="space-y-3">
+                  {filteredPasswords.map(pwd => (
+                    <div key={pwd.id} className={`${cardBg} p-4 rounded-2xl border ${borderColor}`}>
+                      {/* Delete Confirmation */}
+                      {deleteConfirmId === pwd.id && (
+                        <div className="mb-3 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+                          <p className="text-sm font-medium text-red-500 mb-3">
+                            Delete "{pwd.title}"? This cannot be undone.
+                          </p>
+                          <div className="flex gap-2">
                             <button
-                              onClick={() => deletePasswordEntry(pwd.id)}
-                              className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-1 rounded transition-all duration-200 hover:scale-105 active:scale-95"
+                              onClick={() => setDeleteConfirmId(null)}
+                              className="flex-1 px-3 py-2 bg-gray-500 text-white rounded-lg text-sm font-medium active:scale-95 transition-all"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => {
+                                deletePasswordEntry(pwd.id);
+                                setDeleteConfirmId(null);
+                              }}
+                              className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg text-sm font-medium active:scale-95 transition-all"
                             >
                               Delete
                             </button>
                           </div>
-                          <div className="flex gap-2 mt-3">
-                            <input
-                              type={showPasswordId === pwd.id ? 'text' : 'password'}
-                              value={pwd.password}
-                              readOnly
-                              className={`flex-1 px-3 py-2 rounded ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} border ${borderColor}`}
-                            />
-                            <button
-                              onClick={() => setShowPasswordId(showPasswordId === pwd.id ? null : pwd.id)}
-                              className={`px-3 py-2 rounded ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} transition-all duration-200 hover:scale-105 active:scale-95`}
-                            >
-                              {showPasswordId === pwd.id ? 'Hide' : 'Show'}
-                            </button>
-                            <button
-                              onClick={() => copyToClipboard(pwd.password)}
-                              className="px-3 py-2 bg-blue-500 text-white rounded transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95"
-                            >
-                              Copy
-                            </button>
-                          </div>
-                          {pwd.notes && (
-                            <p className={`${textSecondary} text-sm mt-3 p-2 rounded ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                              {pwd.notes}
-                            </p>
+                        </div>
+                      )}
+
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-base truncate">{pwd.title}</h4>
+                          {pwd.username && (
+                            <p className={`text-sm ${textSecondary} truncate`}>{pwd.username}</p>
                           )}
                         </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Notes View */}
-          {activeView === 'notes' && (
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-3xl font-bold">Notes</h2>
-                <button
-                  onClick={() => {
-                    setShowAddNote(!showAddNote);
-                    if (!showAddNote) {
-                      setCurrentNote({ title: '', content: '', category: 'personal' });
-                      setEditingNote(null);
-                    }
-                  }}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95 flex items-center gap-2"
-                >
-                  <Plus size={20} />
-                  {showAddNote ? 'Cancel' : 'New Note'}
-                </button>
-              </div>
-
-              {showAddNote && (
-                <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-6`}>
-                  <h3 className="text-xl font-semibold mb-4">{editingNote ? 'Edit Note' : 'Create New Note'}</h3>
-                  <div className="space-y-3">
-                    <input
-                      type="text"
-                      placeholder="Note title *"
-                      value={currentNote.title}
-                      onChange={(e) => setCurrentNote({...currentNote, title: e.target.value})}
-                      className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
-                    />
-                    <select
-                      value={currentNote.category}
-                      onChange={(e) => setCurrentNote({...currentNote, category: e.target.value})}
-                      className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
-                    >
-                      {noteCategories.map(cat => (
-                        <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
-                      ))}
-                    </select>
-                    <textarea
-                      placeholder="Write your note here..."
-                      value={currentNote.content}
-                      onChange={(e) => setCurrentNote({...currentNote, content: e.target.value})}
-                      rows="10"
-                      className={`w-full px-4 py-3 rounded-lg ${cardBg} border ${borderColor} font-mono`}
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={addOrUpdateNote}
-                        className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95"
-                      >
-                        {editingNote ? 'Update Note' : 'Save Note'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowAddNote(false);
-                          setCurrentNote({ title: '', content: '', category: 'personal' });
-                          setEditingNote(null);
-                        }}
-                        className="px-4 py-3 bg-gray-500 text-white rounded-lg transition-all duration-200 hover:bg-gray-600 hover:scale-105 active:scale-95"
-                      >
-                        Cancel
-                      </button>
+                        <button
+                          onClick={() => setDeleteConfirmId(pwd.id)}
+                          className="p-2 text-red-500 rounded-lg active:bg-red-500/10 transition-colors ml-2"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type={showPasswordId === pwd.id ? 'text' : 'password'}
+                          value={pwd.password}
+                          readOnly
+                          className={`flex-1 px-3 py-2 rounded-xl text-sm ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} w-[65%] sm:w-[70%]`}
+                        />
+                        <button
+                          onClick={() => setShowPasswordId(showPasswordId === pwd.id ? null : pwd.id)}
+                          className={`p-2 rounded-xl flex-shrink-0 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}
+                        >
+                          {showPasswordId === pwd.id ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                        <button
+                          onClick={() => copyToClipboard(pwd.password)}
+                          className="p-2 bg-blue-500 text-white rounded-xl flex-shrink-0"
+                        >
+                          <Copy size={18} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-2 mb-6">
-                <input
-                  type="text"
-                  placeholder="Search notes..."
-                  value={searchNote}
-                  onChange={(e) => setSearchNote(e.target.value)}
-                  className={`flex-1 px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
-                />
-                <select
-                  value={noteCategoryFilter}
-                  onChange={(e) => setNoteCategoryFilter(e.target.value)}
-                  className={`px-4 py-3 rounded-lg ${cardBg} border ${borderColor}`}
-                >
-                  <option value="all">All Categories</option>
-                  {noteCategories.map(cat => (
-                    <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
                   ))}
-                </select>
+                </div>
               </div>
+            )}
+          </div>
+        )}
 
+        {/* Converter View */}
+        {activeView === 'converter' && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">🔁 Unit Converter</h2>
+            
+            <div className="grid grid-cols-3 gap-2">
+              {Object.keys(unitOptions).map(type => (
+                <button
+                  key={type}
+                  onClick={() => handleConverterTypeChange(type)}
+                  className={`px-4 py-3 rounded-xl text-md ${
+                    converterType === type 
+                      ? 'bg-blue-500 text-white' 
+                      : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
+                  }`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+
+            <div className={`${cardBg} p-4 rounded-2xl border ${borderColor} space-y-3`}>
+              <select
+                value={fromUnit}
+                onChange={(e) => {
+                  setFromUnit(e.target.value);
+                  if (inputValue) {
+                    const result = convertUnit(inputValue, e.target.value, toUnit, converterType);
+                    setOutputValue(result);
+                  }
+                }}
+                className={`w-full px-4 py-3 rounded-xl ${cardBg} border ${borderColor}`}
+              >
+                {unitOptions[converterType].map(unit => (
+                  <option key={unit} value={unit}>
+                    {unit.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                value={inputValue}
+                onChange={(e) => handleConvert(e.target.value)}
+                placeholder="Enter value"
+                className={`w-full px-4 py-3 rounded-xl ${cardBg} border ${borderColor} text-xl`}
+              />
+              
+              <select
+                value={toUnit}
+                onChange={(e) => {
+                  setToUnit(e.target.value);
+                  if (inputValue) {
+                    const result = convertUnit(inputValue, fromUnit, e.target.value, converterType);
+                    setOutputValue(result);
+                  }
+                }}
+                className={`w-full px-4 py-3 rounded-xl ${cardBg} border ${borderColor}`}
+              >
+                {unitOptions[converterType].map(unit => (
+                  <option key={unit} value={unit}>
+                    {unit.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </option>
+                ))}
+              </select>
+              <div className={`w-full px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'} text-xl font-bold ${outputValue ? 'text-blue-500' : textSecondary}`}>
+                {outputValue || '0'}
+              </div>
+            </div>
+            {/* Common Conversions Reference */}
+            <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mt-6`}>
+              <h3 className="text-xl font-semibold mb-4">Common Conversions Reference</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredNotes.length === 0 ? (
-                  <div className={`${cardBg} p-8 rounded-xl border ${borderColor} text-center ${textSecondary} col-span-full`}>
-                    <StickyNote size={48} className="mx-auto mb-4 opacity-50" />
-                    <p>No notes found. Create your first note!</p>
-                  </div>
-                ) : (
-                  filteredNotes.map(note => (
-                    <div key={note.id} className={`${cardBg} p-4 rounded-xl border ${borderColor} flex flex-col transition-all duration-200 hover:shadow-lg hover:scale-105`}>
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="text-lg font-semibold flex-1">{note.title}</h4>
-                        <span className={`px-2 py-1 text-xs rounded ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
-                          {note.category}
-                        </span>
-                      </div>
-                      <p className={`${textSecondary} text-sm mb-4 flex-1 line-clamp-4`}>
-                        {note.content || 'No content'}
-                      </p>
-                      <div className={`text-xs ${textSecondary} mb-3`}>
-                        {new Date(note.updatedAt).toLocaleDateString()}
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => editNote(note)}
-                          className="flex-1 px-3 py-2 bg-blue-500 text-white rounded transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95 text-sm"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => deleteNote(note.id)}
-                          className="px-3 py-2 text-red-500 border border-red-500 rounded transition-all duration-200 hover:bg-red-50 dark:hover:bg-red-900/20 hover:scale-105 active:scale-95 text-sm"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  ))
+                <div>
+                  <h4 className="font-semibold mb-2 text-blue-500">Length</h4>
+                  <ul className={`text-sm ${textSecondary} space-y-1`}>
+                    <li>1 km = 1000 m</li>
+                    <li>1 mile = 1.609 km</li>
+                    <li>1 foot = 30.48 cm</li>
+                    <li>1 inch = 2.54 cm</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-semibold mb-2 text-green-500">Weight</h4>
+                  <ul className={`text-sm ${textSecondary} space-y-1`}>
+                    <li>1 kg = 1000 g</li>
+                    <li>1 kg = 2.205 lb</li>
+                    <li>1 lb = 16 oz</li>
+                    <li>1 ton = 1000 kg</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-semibold mb-2 text-orange-500">Temperature</h4>
+                  <ul className={`text-sm ${textSecondary} space-y-1`}>
+                    <li>0°C = 32°F</li>
+                    <li>100°C = 212°F</li>
+                    <li>0 K = -273.15°C</li>
+                    <li>°F = (°C × 9/5) + 32</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-semibold mb-2 text-purple-500">Volume</h4>
+                  <ul className={`text-sm ${textSecondary} space-y-1`}>
+                    <li>1 L = 1000 mL</li>
+                    <li>1 gallon = 3.785 L</li>
+                    <li>1 cup = 236.6 mL</li>
+                    <li>1 fl oz = 29.57 mL</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-semibold mb-2 text-pink-500">Area</h4>
+                  <ul className={`text-sm ${textSecondary} space-y-1`}>
+                    <li>1 km² = 100 hectares</li>
+                    <li>1 acre = 4047 m²</li>
+                    <li>1 hectare = 10000 m²</li>
+                    <li>1 m² = 10.76 ft²</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-semibold mb-2 text-cyan-500">Speed</h4>
+                  <ul className={`text-sm ${textSecondary} space-y-1`}>
+                    <li>1 m/s = 3.6 km/h</li>
+                    <li>1 mph = 1.609 km/h</li>
+                    <li>1 knot = 1.852 km/h</li>
+                    <li>1 km/h = 0.621 mph</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+                  
+
+        {/* Habits View */}
+        {activeView === 'habits' && (
+          <HabitTracker 
+            theme={theme} 
+            habits={habits}
+            setHabits={setHabits}
+            showToast={showToast}
+          />
+        )}
+
+        {/* Expenses View */}
+        {activeView === 'expenses' && (
+          <ExpenseTracker 
+            theme={theme}
+            expenses={expenses}
+            setExpenses={setExpenses}
+            showToast={showToast}
+          />
+        )}
+
+        {/* Text Counter View */}
+        {activeView === 'textcounter' && (
+          <TextCounter 
+            theme={theme}
+            showToast={showToast}
+          />
+        )}
+
+        {/* Cricket View */}
+        {activeView === 'cricket' && (
+          <CricketScoreboard 
+            theme={theme}
+            showToast={showToast}
+          />
+        )}
+
+        {/* News View */}
+        {activeView === 'news' && (
+          <NewsFeed 
+            theme={theme}
+            showToast={showToast}
+          />
+        )}
+
+        {/* Timezone View */}
+        {activeView === 'timezone' && (
+          <TimeZoneConverter 
+            theme={theme}
+            showToast={showToast}
+          />
+        )}
+
+
+
+        {/* Water Intake View */}
+        {activeView === 'water' && (
+          <WaterIntake 
+            theme={theme}
+            showToast={showToast}
+          />
+        )}
+
+        {/* Watchlist View */}
+        {activeView === 'watchlist' && <Watchlist theme={theme} showToast={showToast} />}
+
+        {/* Quick Links View */}
+        {activeView === 'links' && <QuickLinks theme={theme} links={links} setLinks={setLinks} />}
+
+        {/* Calculator View */}
+        {activeView === 'calculator' && <Calculator theme={theme} />}
+
+        {/* AgeCalculator View */}
+        {activeView === 'agecalculator' && (
+          <AgeCalculator theme={theme} showToast={showToast} />
+        )}
+
+        {/* PDF Tools View */}
+        {activeView === 'pdftools' && (
+          <PdfTools theme={theme} showToast={showToast} />
+        )}
+
+        {/* Find & Replace View */}
+        {activeView === 'findreplace' && (
+          <FindReplace theme={theme} showToast={showToast} />
+        )}
+
+        {/* Games View */}
+        {activeView === 'games' && (
+          <div>
+            {!activeGame ? (
+              <GamesMenu 
+                onSelectGame={(gameId) => {
+                  setActiveGame(gameId);
+                  if (gameId === 'memory') initMemoryGame();
+                  if (gameId === 'guess') initGuessingGame();
+                  if (gameId === 'tic-tac-toe') initTicTacToe();
+                  if (gameId === 'word-guess') initWordGuess();
+                  if (gameId === 'typing-test') initTypingTest();
+                  if (gameId === 'whac-a-mole') initWhacAMole();
+                  if (gameId === 'simon-says') initSimonGame();
+                  if (gameId === 'connect-four') initConnectFour();
+                }}
+                theme={theme}
+                cardBg={cardBg}
+                borderColor={borderColor}
+                textSecondary={textSecondary}
+              />
+            ) : (
+              <div>
+                <button
+                  onClick={() => setActiveGame(null)}
+                  className="mb-4 px-4 py-2 bg-gray-500 text-white rounded-xl"
+                >
+                  ← Back
+                </button>
+
+                {activeGame === 'memory' && (
+                  <MemoryMatch
+                    memoryCards={memoryCards}
+                    flippedCards={flippedCards}
+                    matchedCards={matchedCards}
+                    memoryMoves={memoryMoves}
+                    gameWon={gameWon}
+                    onCardClick={handleCardClick}
+                    onNewGame={initMemoryGame}
+                    theme={theme}
+                    cardBg={cardBg}
+                    borderColor={borderColor}
+                    textSecondary={textSecondary}
+                  />
+                )}
+
+                {activeGame === 'guess' && (
+                  <NumberGuessing
+                    guessNumber={guessNumber}
+                    guessAttempts={guessAttempts}
+                    guessHistory={guessHistory}
+                    gameWon={gameWon}
+                    onGuess={handleGuess}
+                    onNewGame={initGuessingGame}
+                    onInputChange={setGuessNumber}
+                    theme={theme}
+                    cardBg={cardBg}
+                    borderColor={borderColor}
+                    textSecondary={textSecondary}
+                  />
+                )}
+
+                {activeGame === 'reaction' && (
+                  <ReactionTime
+                    reactionStartTime={reactionStartTime}
+                    reactionWaiting={reactionWaiting}
+                    reactionTimes={reactionTimes}
+                    onStart={startReactionTest}
+                    onClick={handleReactionClick}
+                    theme={theme}
+                    cardBg={cardBg}
+                    borderColor={borderColor}
+                    textSecondary={textSecondary}
+                  />
+                )}
+
+                {activeGame === 'tic-tac-toe' && (
+                  <TicTacToe
+                    board={ticTacToeBoard}
+                    winner={ticTacToeWinner}
+                    currentPlayer={currentPlayer}
+                    onCellClick={handleCellClick}
+                    onNewGame={initTicTacToe}
+                    theme={theme}
+                    cardBg={cardBg}
+                    borderColor={borderColor}
+                    textSecondary={textSecondary}
+                  />
+                )}
+
+                {activeGame === 'word-guess' && (
+                  <WordGuess
+                    guesses={wordGuesses}
+                    currentGuess={currentGuess}
+                    gameStatus={wordGuessStatus}
+                    onNewGame={initWordGuess}
+                    cardBg={cardBg}
+                    borderColor={borderColor}
+                    textSecondary={textSecondary}
+                  />
+                )}
+
+                {activeGame === 'typing-test' && (
+                  <TypingTest
+                    textToType={typingText}
+                    userInput={userInput}
+                    gameStatus={typingStatus}
+                    wpm={wpm}
+                    accuracy={accuracy}
+                    onInputChange={handleTypingInputChange}
+                    onNewGame={initTypingTest}
+                    cardBg={cardBg}
+                    borderColor={borderColor}
+                    textSecondary={textSecondary}
+                  />
+                )}
+
+                {activeGame === 'whac-a-mole' && (
+                  <WhacAMole
+                    moles={moles}
+                    score={whacScore}
+                    timeLeft={whacTimeLeft}
+                    gameActive={isWhacActive}
+                    onMoleWhack={handleMoleWhack}
+                    onNewGame={initWhacAMole}
+                    cardBg={cardBg}
+                    borderColor={borderColor}
+                  />
+                )}
+
+                {activeGame === 'simon-says' && (
+                  <SimonSays
+                    sequence={simonSequence}
+                    playerTurn={isPlayerTurn}
+                    gameStatus={simonStatus}
+                    litButton={litButton}
+                    onButtonClick={handleSimonClick}
+                    onNewGame={initSimonGame}
+                    cardBg={cardBg}
+                    borderColor={borderColor}
+                    textSecondary={textSecondary}
+                  />
+                )}
+
+                {activeGame === 'connect-four' && (
+                  <ConnectFour
+                    board={connectFourBoard}
+                    winner={connectFourWinner}
+                    currentPlayer={cfCurrentPlayer}
+                    onColumnClick={handleColumnClick}
+                    onNewGame={initConnectFour}
+                    cardBg={cardBg}
+                    borderColor={borderColor}
+                  />
+                )}
+
+                {activeGame === 'chess' && (
+                  <Chess
+                    theme={theme}
+                    cardBg={cardBg}
+                    borderColor={borderColor}
+                    textSecondary={textSecondary}
+                    showToast={showToast}
+                  />
                 )}
               </div>
-            </div>
-          )} 
+            )}
+          </div>
+        )}
 
-          {/* Games View */}
-          {activeView === 'games' && (
-            <div>
-              {!activeGame ? (
-                <GamesMenu 
-                  onSelectGame={(gameId) => {
-                    setActiveGame(gameId);
-                    if (gameId === 'memory') initMemoryGame();
-                    if (gameId === 'guess') initGuessingGame();
-                    if (gameId === 'tic-tac-toe') initTicTacToe();
-                    if (gameId === 'word-guess') initWordGuess();
-                    if (gameId === 'typing-test') initTypingTest();
-                    if (gameId === 'whac-a-mole') initWhacAMole();
-                    if (gameId === 'simon-says') initSimonGame();
-                    if (gameId === 'connect-four') initConnectFour();
-                  }}
-                  theme={theme}
-                  cardBg={cardBg}
-                  borderColor={borderColor}
-                  textSecondary={textSecondary}
-                />
-              ) : (
+        {/* Settings View */}
+        {activeView === 'settings' && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Settings</h2>
+            
+            <div className={`${cardBg} p-4 rounded-2xl border ${borderColor}`}>
+              <div className="flex items-center justify-between">
                 <div>
-                  <button
-                    onClick={() => setActiveGame(null)}
-                    className="mb-6 px-4 py-2 bg-gray-500 text-white rounded-lg transition-all duration-200 hover:bg-gray-600 hover:scale-105 active:scale-95"
-                  >
-                    ← Back to Games
-                  </button>
-
-                  {activeGame === 'memory' && (
-                    <MemoryMatch
-                      memoryCards={memoryCards}
-                      flippedCards={flippedCards}
-                      matchedCards={matchedCards}
-                      memoryMoves={memoryMoves}
-                      gameWon={gameWon}
-                      onCardClick={handleCardClick}
-                      onNewGame={initMemoryGame}
-                      theme={theme}
-                      cardBg={cardBg}
-                      borderColor={borderColor}
-                      textSecondary={textSecondary}
-                    />
-                  )}
-
-                  {activeGame === 'guess' && (
-                    <NumberGuessing
-                      guessNumber={guessNumber}
-                      guessAttempts={guessAttempts}
-                      guessHistory={guessHistory}
-                      gameWon={gameWon}
-                      onGuess={handleGuess}
-                      onNewGame={initGuessingGame}
-                      onInputChange={setGuessNumber}
-                      theme={theme}
-                      cardBg={cardBg}
-                      borderColor={borderColor}
-                      textSecondary={textSecondary}
-                    />
-                  )}
-
-                  {activeGame === 'reaction' && (
-                    <ReactionTime
-                      reactionStartTime={reactionStartTime}
-                      reactionWaiting={reactionWaiting}
-                      reactionTimes={reactionTimes}
-                      onStart={startReactionTest}
-                      onClick={handleReactionClick}
-                      theme={theme}
-                      cardBg={cardBg}
-                      borderColor={borderColor}
-                      textSecondary={textSecondary}
-                    />
-                  )}
-
-                  {activeGame === 'tic-tac-toe' && (
-                    <TicTacToe
-                      board={ticTacToeBoard}
-                      winner={ticTacToeWinner}
-                      currentPlayer={currentPlayer}
-                      onCellClick={handleCellClick}
-                      onNewGame={initTicTacToe}
-                      theme={theme}
-                      cardBg={cardBg}
-                      borderColor={borderColor}
-                      textSecondary={textSecondary}
-                    />
-                  )}
-
-                  {activeGame === 'word-guess' && (
-                    <WordGuess
-                      guesses={wordGuesses}
-                      currentGuess={currentGuess}
-                      gameStatus={wordGuessStatus}
-                      onNewGame={initWordGuess}
-                      cardBg={cardBg}
-                      borderColor={borderColor}
-                      textSecondary={textSecondary}
-                    />
-                  )}
-
-                  {activeGame === 'typing-test' && (
-                    <TypingTest
-                      textToType={typingText}
-                      userInput={userInput}
-                      gameStatus={typingStatus}
-                      wpm={wpm}
-                      accuracy={accuracy}
-                      onInputChange={handleTypingInputChange}
-                      onNewGame={initTypingTest}
-                      cardBg={cardBg}
-                      borderColor={borderColor}
-                      textSecondary={textSecondary}
-                    />
-                  )}
-
-                  {activeGame === 'whac-a-mole' && (
-                    <WhacAMole
-                      moles={moles}
-                      score={whacScore}
-                      timeLeft={whacTimeLeft}
-                      gameActive={isWhacActive}
-                      onMoleWhack={handleMoleWhack}
-                      onNewGame={initWhacAMole}
-                      cardBg={cardBg}
-                      borderColor={borderColor}
-                    />
-                  )}
-
-                  {activeGame === 'simon-says' && (
-                    <SimonSays
-                      sequence={simonSequence}
-                      playerTurn={isPlayerTurn}
-                      gameStatus={simonStatus}
-                      litButton={litButton}
-                      onButtonClick={handleSimonClick}
-                      onNewGame={initSimonGame}
-                      cardBg={cardBg}
-                      borderColor={borderColor}
-                      textSecondary={textSecondary}
-                    />
-                  )}
-
-                  {activeGame === 'connect-four' && (
-                    <ConnectFour
-                      board={connectFourBoard}
-                      winner={connectFourWinner}
-                      currentPlayer={cfCurrentPlayer}
-                      onColumnClick={handleColumnClick}
-                      onNewGame={initConnectFour}
-                      cardBg={cardBg}
-                      borderColor={borderColor}
-                    />
-                  )}
+                  <p className="font-medium">Theme</p>
+                  <p className={`text-sm ${textSecondary}`}>Switch appearance</p>
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* Watchlist View */}
-          {activeView === 'watchlist' && <Watchlist theme={theme} />}
-
-          {/* Quick Links View */}
-          {activeView === 'links' && <QuickLinks theme={theme} links={links} setLinks={setLinks} />}
-
-          {/* Calculator View */}
-          {activeView === 'calculator' && <Calculator theme={theme} />}
-
-          {/* Ai Chat View */}
-          {activeView === 'aichat' && <AiChat theme={theme} />}
-
-          {/* Music Player View */}
-          {activeView === 'music' && (
-            <MusicPlayer theme={theme} showToast={showToast} />
-          )}
-
-          {/* PDF Tools View */}
-          {activeView === 'pdftools' && (
-            <PdfTools
-              theme={theme}
-              showToast={showToast}
-            />
-          )}
-
-          {/* Settings View */}
-          {activeView === 'settings' && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6">Settings</h2>
-              
-              <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-4`}>
-                <h3 className="text-xl font-semibold mb-4">Appearance</h3>
-                <div className="flex items-center justify-between">
-                  <span>Theme</span>
-                  <button
-                    onClick={toggleTheme}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95"
-                  >
-                    {theme === 'dark' ? 'Switch to Light' : 'Switch to Dark'}
-                  </button>
-                </div>
-              </div>
-
-              <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-4`}>
-                <h3 className="text-xl font-semibold mb-4">Security</h3>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Auto-lock Vault</p>
-                    <p className={`text-sm ${textSecondary}`}>Lock password vault after inactivity</p>
-                  </div>
-                  <select
-                    value={autoLockTimeout}
-                    onChange={(e) => {
-                      setAutoLockTimeout(parseInt(e.target.value));
-                      localStorage.setItem('autoLockTimeout', e.target.value);
-                      showToast('Auto-lock timeout updated');
-                    }}
-                    className={`px-4 py-2 rounded-lg ${cardBg} border ${borderColor}`}
-                  >
-                    <option value="1">1 minute</option>
-                    <option value="5">5 minutes</option>
-                    <option value="10">10 minutes</option>
-                    <option value="15">15 minutes</option>
-                    <option value="30">30 minutes</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className={`${cardBg} p-6 rounded-xl border ${borderColor} mb-4`}>
-                <h3 className="text-xl font-semibold mb-4">Data Management</h3>
-                <div className="space-y-3">
-                  <button className="w-full px-4 py-3 bg-blue-500 text-white rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105 active:scale-95 flex items-center justify-center gap-2">
-                    <Download size={20} />
-                    Export Data
-                  </button>
-                  <button className="w-full px-4 py-3 bg-gray-500 text-white rounded-lg transition-all duration-200 hover:bg-gray-600 hover:scale-105 active:scale-95 flex items-center justify-center gap-2">
-                    <Upload size={20} />
-                    Import Data
-                  </button>
-                </div>
-              </div>
-
-              <div className={`${cardBg} p-6 rounded-xl border border-red-500`}>
-                <h3 className="text-xl font-semibold mb-4 text-red-500">Danger Zone</h3>
-                <button 
-                  onClick={clearAllData}
-                  className="w-full px-4 py-3 bg-red-500 text-white rounded-lg transition-all duration-200 hover:bg-red-600 hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+                <button
+                  onClick={toggleTheme}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-xl"
                 >
-                  <Trash2 size={20} />
-                  Clear All Data
+                  {theme === 'dark' ? 'Light' : 'Dark'}
                 </button>
-                <p className={`text-sm ${textSecondary} mt-2`}>
-                  ⚠️ This will delete all data. Requires master password.
-                </p>
               </div>
             </div>
-          )}
-        </main>
-      </div>
+
+            <div className={`${cardBg} p-4 rounded-2xl border ${borderColor}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Auto-lock Vault</p>
+                  <p className={`text-sm ${textSecondary}`}>After inactivity</p>
+                </div>
+                <select
+                  value={autoLockTimeout}
+                  onChange={(e) => {
+                    setAutoLockTimeout(parseInt(e.target.value));
+                    localStorage.setItem('autoLockTimeout', e.target.value);
+                    showToast('Updated');
+                  }}
+                  className={`px-4 py-2 rounded-xl ${cardBg} border ${borderColor}`}
+                >
+                  <option value="1">1 min</option>
+                  <option value="5">5 min</option>
+                  <option value="10">10 min</option>
+                </select>
+              </div>
+            </div>
+
+            <button 
+              onClick={clearAllData}
+              className="w-full px-4 py-3 bg-red-500 text-white rounded-xl font-medium"
+            >
+              Clear All Data
+            </button>
+          </div>
+        )}
+
+        {/* More Menu - Scrollable */}
+        {activeView === 'more' && (
+          <div className="space-y-4 pb-6">
+            <h2 className="text-2xl font-bold">More Apps</h2>
+            
+            <div className="grid grid-cols-3 gap-3 max-h-[calc(100vh-200px)] overflow-y-auto pb-4">
+              {[
+                { id: 'todos', label: 'Tasks', icon: CheckSquare },
+                { id: 'notes', label: 'Notes', icon: StickyNote },
+                { id: 'news', label: 'News', icon: Newspaper },
+                { id: 'passwords', label: 'Passwords', icon: Key },
+                { id: 'habits', label: 'Habits', icon: Goal },
+                { id: 'expenses', label: 'Expenses', icon: HandCoins },
+                { id: 'watchlist', label: 'Watchlist', icon: Clapperboard },
+                { id: 'birthdays', label: 'Birthdays', icon: Cake },
+                { id: 'games', label: 'Games', icon: Gamepad2 },
+                { id: 'links', label: 'Links', icon: Link2 },
+                { id: 'timers', label: 'Timers', icon: Clock },
+                { id: 'water', label: 'Water', icon: Droplet },
+                { id: 'calculator', label: 'Calculator', icon: CalculatorIcon },
+                { id: 'agecalculator', label: 'Age Calc', icon: CalendarSearch },
+                { id: 'converter', label: 'Converter', icon: Gauge },
+                { id: 'textcounter', label: 'Text', icon: ScanText },
+                { id: 'timezone', label: 'Timezone', icon: CalendarClock },
+                { id: 'pdftools', label: 'PDF', icon: FileText },
+                { id: 'findreplace', label: 'Find & Replace', icon: TextSearch },
+                { id: 'settings', label: 'Settings', icon: Settings },
+              ].map(item => {
+                const Icon = typeof item.icon === 'string' ? null : item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveView(item.id)}
+                    className={`${cardBg} p-4 rounded-2xl border ${borderColor} text-center shadow-md hover:shadow-lg transition-all hover:scale-105`}
+                  >
+                    {Icon ? <Icon className="mx-auto mb-2" size={24} /> : <span className="text-2xl mb-2 block">{item.icon}</span>}
+                    <p className="text-xs font-medium">{item.label}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Floating Action Button (FAB) with Menu */}
+      {!showFABMenu && ['dashboard', 'todos', 'notes'].includes(activeView) && (
+        <button
+          onClick={() => setShowFABMenu(true)}
+          className="fixed bottom-24 right-6 w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-full shadow-2xl flex items-center justify-center z-30"
+        >
+          <Plus size={24} />
+        </button>
+      )}
+
+      {/* FAB Menu */}
+      {showFABMenu && (
+        <>
+          <div 
+            className="fixed inset-0 z-30"
+            onClick={() => setShowFABMenu(false)}
+            style={{
+              backdropFilter: 'blur(1px)',
+              WebkitBackdropFilter: 'blur(1px)',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)'
+            }}
+          />
+          <div className="fixed bottom-24 right-6 z-40 space-y-3">
+            {fabActions.map((action, idx) => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={action.id}
+                  onClick={action.action}
+                  className={`flex items-center gap-3 ${cardBg} px-4 py-3 rounded-full shadow-2xl border ${borderColor} animate-pop-up hover:scale-105 transition-all`}
+                  style={{ animationDelay: `${idx * 50}ms` }}
+                >
+                  <Icon size={20} className="text-blue-500" />
+                  <span className="font-medium">{action.label}</span>
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setShowFABMenu(false)}
+              className="w-14 h-14 bg-red-500 text-white rounded-full shadow-2xl flex items-center justify-center ml-auto hover:bg-red-600 transition-all hover:scale-110"
+            >
+              <X size={24} />
+            </button>
+          </div>
+        </>
+      )}
+      </div>{/* End main-content */}
     </div>
   );
 };

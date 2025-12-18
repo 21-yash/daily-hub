@@ -20,11 +20,11 @@ export const indianHolidays = [
   { month: 11, day: 1, name: 'All Saints Day', emoji: '😇' },
 ];
 
-// Variable date holidays for 2024-2025 (these change yearly based on lunar calendar)
-export const variableHolidays2024 = [
+// Variable date holidays for 2025-2026 (these change yearly based on lunar calendar)
+export const variableHolidays2026 = [
   { month: 1, day: 14, name: 'Makar Sankranti', emoji: '🪁' },
-  { month: 3, day: 8, name: 'Maha Shivaratri', emoji: '🕉️' },
-  { month: 3, day: 25, name: 'Holi', emoji: '🎨' },
+  { month: 2, day: 15, name: 'Maha Shivaratri', emoji: '🕉️' },
+  { month: 3, day: 4, name: 'Holi', emoji: '🎨' },
   { month: 4, day: 11, name: 'Eid ul-Fitr', emoji: '🌙' },
   { month: 4, day: 17, name: 'Ram Navami', emoji: '🏹' },
   { month: 4, day: 21, name: 'Mahavir Jayanti', emoji: '🙏' },
@@ -32,10 +32,10 @@ export const variableHolidays2024 = [
   { month: 8, day: 26, name: 'Janmashtami', emoji: '🦚' },
   { month: 9, day: 7, name: 'Ganesh Chaturthi', emoji: '🐘' },
   { month: 10, day: 2, name: 'Dussehra', emoji: '🏹' },
-  { month: 10, day: 22, name: 'Diwali', emoji: '🪔' },
-  { month: 11, day: 1, name: 'Govardhan Puja', emoji: '🐄' },
-  { month: 10, day: 27, name: 'Bhai Dooj', emoji: '👫' },
-  { month: 11, day: 15, name: 'Guru Nanak Jayanti', emoji: '🙏' },
+  { month: 10, day: 21, name: 'Diwali', emoji: '🪔' },
+  { month: 10, day: 22, name: 'Govardhan Puja', emoji: '🐄' },
+  { month: 10, day: 23, name: 'Bhai Dooj', emoji: '👫' },
+  { month: 11, day: 5, name: 'Guru Nanak Jayanti', emoji: '🙏' },
 ];
 
 export const getSpecialDaysForDate = (date) => {
@@ -46,7 +46,7 @@ export const getSpecialDaysForDate = (date) => {
     holiday => holiday.month === month && holiday.day === day
   );
   
-  const variableHolidays = variableHolidays2024.filter(
+  const variableHolidays = variableHolidays2026.filter(
     holiday => holiday.month === month && holiday.day === day
   );
   
@@ -55,7 +55,7 @@ export const getSpecialDaysForDate = (date) => {
 
 export const getUpcomingHolidays = (count = 5) => {
   const today = new Date();
-  const allHolidays = [...indianHolidays, ...variableHolidays2024];
+  const allHolidays = [...indianHolidays, ...variableHolidays2026];
   
   return allHolidays
     .map(holiday => {

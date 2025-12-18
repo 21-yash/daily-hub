@@ -74,7 +74,7 @@ class GreetingService {
 
     // Special occasions (format: MM-DD)
     this.specialDates = {
-      "01-01": ["Happy New Year! 🎊", "New year, new you!", "2024 begins!"],
+      "01-01": ["Happy New Year! 🎊", "New year, new you!", "2026 begins!"],
       "02-14": ["Happy Valentine's Day! ❤️", "Love is in the air!", "Spread the love!"],
       "10-31": ["Happy Halloween! 🎃", "Spooky season!", "Trick or treat!"],
       "12-25": ["Merry Christmas! 🎄", "Happy Holidays!", "Season's greetings!"],
@@ -82,8 +82,11 @@ class GreetingService {
       "01-26": ["Happy Republic Day! 🇮🇳", "Proud to be Indian!", "Jai Hind!"],
       "03-14": ["Happy Holi! 🎨", "Festival of Colors!", "Let the colors fly!"],
       "08-15": ["Happy Independence Day! 🇮🇳", "Celebrating freedom!", "Jai Hind!"],
-      "10-02": ["Happy Gandhi Jayanti!", "Remembering Mahatma Gandhi.", ""],
-      "10-22": ["Happy Diwali! 🪔", "Festival of Lights!", "Wishing you joy and prosperity!"] 
+      "10-02": ["Happy Gandhi Jayanti!", "Remembering Mahatma Gandhi."],
+      "10-20": ["Happy Diwali! 🪔", "Festival of Lights!", "Wishing you joy and prosperity!"],
+      "10-22": ["Happy Govardhan Puja! 🐄", "Celebrating the divine!", "Wishing you blessings!"],
+      "10-23": ["Happy Bhai Dooj! 👫", "Celebrating sibling love!", "Wishing you joy!"],
+      "11-05": ["Happy Guru Nanak Jayanti! 🙏", "Remembering Guru Nanak Dev Ji.", "Wishing you peace and harmony!"]
     };
 
     // Random fun greetings (like Claude's personality)
@@ -130,9 +133,9 @@ class GreetingService {
    * Get time-based greeting
    */
   getTimeGreeting(hour) {
-    if (hour < 12) return this.random(this.morningGreetings);
-    if (hour < 17) return this.random(this.afternoonGreetings);
-    if (hour < 21) return this.random(this.eveningGreetings);
+    if (hour >= 5 && hour < 12) return this.random(this.morningGreetings);
+    if (hour >= 12 && hour < 17) return this.random(this.afternoonGreetings);
+    if (hour >= 17 && hour < 21) return this.random(this.eveningGreetings);
     return this.random(this.nightGreetings);
   }
 
@@ -184,14 +187,14 @@ class GreetingService {
 
     // Priority 2: Mix of different greeting types
     const greetingTypes = [
-      () => this.getTimeGreeting(hour),        // Time-based (30%)
+      () => this.getTimeGreeting(hour),        // Time-based (40%)
       () => this.getDayGreeting(day),          // Day-based (20%)
       () => this.random(this.funGreetings),    // Fun random (30%)
-      () => this.getSeasonalGreeting(month)    // Seasonal (20%)
+      () => this.getSeasonalGreeting(month)    // Seasonal (10%)
     ];
 
     // Weighted random selection
-    const weights = [30, 20, 30, 20];
+    const weights = [40, 20, 30, 10];
     const totalWeight = weights.reduce((a, b) => a + b, 0);
     let random = Math.random() * totalWeight;
     
@@ -226,9 +229,9 @@ class GreetingService {
    * Get greeting icon/emoji
    */
   getGreetingIcon(hour) {
-    if (hour < 12) return '🌅';
-    if (hour < 17) return '☀️';
-    if (hour < 21) return '🌆';
+    if (hour >= 5 && hour < 12) return '🌅';
+    if (hour >= 12 && hour < 17) return '☀️';
+    if (hour >= 17 && hour < 21) return '🌆';
     return '🌙';
   }
 
