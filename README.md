@@ -153,6 +153,6 @@ This project is open source and available under the [MIT License](LICENSE).
 
 <div align="center">
 
-**Made with by [Yash](https://github.com/21-yash)**
+**Made by [Yash](https://github.com/21-yash)**
 
 </div>
