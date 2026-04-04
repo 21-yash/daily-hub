@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Activity, AlertCircle, CheckCircle, X, Trophy, MapPin } from 'lucide-react';
+import { RefreshCw, Activity, AlertCircle, CheckCircle, X, Trophy, MapPin, Users } from 'lucide-react';
 
 const CricketScoreboard = ({ theme, showToast }) => {
     const [matches, setMatches] = useState([]);
@@ -10,6 +10,9 @@ const CricketScoreboard = ({ theme, showToast }) => {
     const [scorecardData, setScorecardData] = useState(null);
     const [scorecardLoading, setScorecardLoading] = useState(false);
     const [showScorecard, setShowScorecard] = useState(false);
+    const [squadData, setSquadData] = useState(null);
+    const [squadLoading, setSquadLoading] = useState(false);
+    const [showSquad, setShowSquad] = useState(false);
     const [filter, setFilter] = useState('live');
     const [autoRefresh, setAutoRefresh] = useState(true);
     const [backendStatus, setBackendStatus] = useState('checking');
@@ -18,7 +21,7 @@ const CricketScoreboard = ({ theme, showToast }) => {
     const borderColor = theme === 'dark' ? 'border-gray-700' : 'border-gray-200';
     const textSecondary = theme === 'dark' ? 'text-gray-400' : 'text-gray-600';
 
-    const BACKEND_URL = 'https://backend-4z7z.onrender.com';
+    const BACKEND_URL = import.meta.env.VITE_API_URL;
 
     const filterOptions = [
         { value: 'live', label: 'Live', icon: '🔴' },
@@ -71,7 +74,7 @@ const CricketScoreboard = ({ theme, showToast }) => {
 
     const checkBackendHealth = async () => {
         try {
-            const response = await fetch(`${BACKEND_URL}/api/health`, { signal: AbortSignal.timeout(3000) });
+            const response = await fetch(`${BACKEND_URL}/health`, { signal: AbortSignal.timeout(3000) });
             const data = await response.json();
             setBackendStatus(data.success ? 'online' : 'offline');
         } catch (error) {
@@ -83,8 +86,8 @@ const CricketScoreboard = ({ theme, showToast }) => {
         setLoading(true);
         try {
             const endpoint = backendStatus === 'offline' ?
-                `${BACKEND_URL}/api/cricket/test` :
-                `${BACKEND_URL}/api/cricket/live-matches`;
+                `${BACKEND_URL}/cricket/test` :
+                `${BACKEND_URL}/cricket/live-matches`;
 
             const response = await fetch(endpoint, { signal: AbortSignal.timeout(8000) });
             const data = await response.json();
@@ -121,9 +124,11 @@ const CricketScoreboard = ({ theme, showToast }) => {
         setModalData(null);
         setShowScorecard(false);
         setScorecardData(null);
+        setShowSquad(false);
+        setSquadData(null);
 
         try {
-            const response = await fetch(`${BACKEND_URL}/api/cricket/match-details`, {
+            const response = await fetch(`${BACKEND_URL}/cricket/match-details`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ matchUrl: match.link }),
@@ -154,7 +159,7 @@ const CricketScoreboard = ({ theme, showToast }) => {
         setShowScorecard(true);
         
         try {
-            const response = await fetch(`${BACKEND_URL}/api/cricket/scorecard/${match.id}/${match.slug}`, {
+            const response = await fetch(`${BACKEND_URL}/cricket/scorecard/${match.id}/${match.slug}`, {
                 signal: AbortSignal.timeout(15000),
             });
             const data = await response.json();
@@ -169,6 +174,35 @@ const CricketScoreboard = ({ theme, showToast }) => {
             setShowScorecard(false);
         } finally {
             setScorecardLoading(false);
+        }
+    };
+
+    const fetchSquad = async (match) => {
+        if (!match.id || !match.slug || match.id.startsWith('test-')) {
+            showToast("Squad is not available for this match.", "info");
+            return;
+        }
+        
+        setSquadLoading(true);
+        setShowSquad(true);
+        setShowScorecard(false);
+        
+        try {
+            const response = await fetch(`${BACKEND_URL}/cricket/squads/${match.id}/${match.slug}`, {
+                signal: AbortSignal.timeout(10000),
+            });
+            const data = await response.json();
+            if (data.success) {
+                setSquadData(data.squads);
+            } else {
+                throw new Error(data.error || 'Failed to fetch squad');
+            }
+        } catch (error) {
+            console.error('Error fetching squad:', error);
+            showToast('Could not fetch squad data.', 'error');
+            setShowSquad(false);
+        } finally {
+            setSquadLoading(false);
         }
     };
 
@@ -522,6 +556,106 @@ const CricketScoreboard = ({ theme, showToast }) => {
         );
     };
 
+    const renderSquad = () => {
+        if (squadLoading) {
+            return (
+                <div className="flex flex-col items-center justify-center p-10">
+                    <RefreshCw size={32} className="animate-spin text-blue-500 mb-4" />
+                    <p className={textSecondary}>Loading squad...</p>
+                </div>
+            );
+        }
+
+        if (!squadData || !squadData.teams) {
+            return (
+                <div className="p-10 text-center">
+                    <p className={textSecondary}>Could not load squad data.</p>
+                </div>
+            );
+        }
+
+        const teamNames = Object.keys(squadData.teams);
+
+        return (
+            <div className="p-4 sm:p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 140px)' }}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {teamNames.map((teamName) => {
+                        const team = squadData.teams[teamName];
+                        return (
+                            <div key={teamName} className={`${cardBg} border ${borderColor} rounded-xl overflow-hidden`}>
+                                <div className={`p-3 ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'} border-b ${borderColor}`}>
+                                    <h4 className="font-bold text-lg">{teamName}</h4>
+                                </div>
+                                
+                                {/* Playing XI */}
+                                {team.playingXI && team.playingXI.length > 0 && (
+                                    <div className="p-3">
+                                        <h5 className={`text-sm font-semibold ${textSecondary} mb-2`}>Playing XI</h5>
+                                        <div className="space-y-2">
+                                            {team.playingXI.map((player, idx) => (
+                                                <div key={player.id || idx} className="flex items-center gap-3">
+                                                    {player.image ? (
+                                                        <img 
+                                                            src={player.image} 
+                                                            alt={player.name}
+                                                            className="w-10 h-10 rounded-full object-cover"
+                                                            onError={(e) => { e.target.style.display = 'none'; }}
+                                                        />
+                                                    ) : (
+                                                        <div className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200'} flex items-center justify-center`}>
+                                                            <Users size={16} className={textSecondary} />
+                                                        </div>
+                                                    )}
+                                                    <div className="flex-1">
+                                                        <p className="font-medium text-sm">
+                                                            {player.name}
+                                                            {player.isCaptain && <span className="text-blue-500 ml-1">(C)</span>}
+                                                            {player.isKeeper && <span className="text-green-500 ml-1">(WK)</span>}
+                                                        </p>
+                                                        {player.role && <p className={`text-xs ${textSecondary}`}>{player.role}</p>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Bench */}
+                                {team.bench && team.bench.length > 0 && (
+                                    <div className={`p-3 border-t ${borderColor}`}>
+                                        <h5 className={`text-sm font-semibold ${textSecondary} mb-2`}>Bench</h5>
+                                        <div className="space-y-2">
+                                            {team.bench.map((player, idx) => (
+                                                <div key={player.id || idx} className="flex items-center gap-3">
+                                                    {player.image ? (
+                                                        <img 
+                                                            src={player.image} 
+                                                            alt={player.name}
+                                                            className="w-8 h-8 rounded-full object-cover opacity-75"
+                                                            onError={(e) => { e.target.style.display = 'none'; }}
+                                                        />
+                                                    ) : (
+                                                        <div className={`w-8 h-8 rounded-full ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200'} flex items-center justify-center`}>
+                                                            <Users size={14} className={textSecondary} />
+                                                        </div>
+                                                    )}
+                                                    <div className="flex-1">
+                                                        <p className={`text-sm ${textSecondary}`}>{player.name}</p>
+                                                        {player.role && <p className={`text-xs ${textSecondary} opacity-75`}>{player.role}</p>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="pb-20">
             <div className="mb-6">
@@ -687,29 +821,42 @@ const CricketScoreboard = ({ theme, showToast }) => {
                                 
                                 <div className="flex gap-2">
                                     <button
-                                        onClick={() => setShowScorecard(false)}
-                                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all active:scale-95 ${!showScorecard ? 'bg-blue-500 text-white' : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}
+                                        onClick={() => { setShowScorecard(false); setShowSquad(false); }}
+                                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all active:scale-95 ${!showScorecard && !showSquad ? 'bg-blue-500 text-white' : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}
                                     >
-                                        Live View
+                                        Live
                                     </button>
                                     <button
                                         onClick={() => {
+                                            setShowSquad(false);
                                             if (!scorecardData && !scorecardLoading) {
                                                 fetchScorecard(selectedMatch);
                                             } else {
                                                 setShowScorecard(true);
                                             }
                                         }}
-                                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all active:scale-95 flex items-center justify-center gap-2 ${showScorecard ? 'bg-blue-500 text-white' : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}
+                                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all active:scale-95 flex items-center justify-center gap-1 ${showScorecard && !showSquad ? 'bg-blue-500 text-white' : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}
                                     >
-                                        <Trophy size={16} />
-                                        Full Scorecard
+                                        Scorecard
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowScorecard(false);
+                                            if (!squadData && !squadLoading) {
+                                                fetchSquad(selectedMatch);
+                                            } else {
+                                                setShowSquad(true);
+                                            }
+                                        }}
+                                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all active:scale-95 flex items-center justify-center gap-1 ${showSquad ? 'bg-blue-500 text-white' : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}
+                                    >
+                                        Squad
                                     </button>
                                 </div>
                             </div>
 
                             <div className="flex-1 overflow-hidden">
-                                {showScorecard ? renderScorecard() : renderLiveView()}
+                                {showSquad ? renderSquad() : showScorecard ? renderScorecard() : renderLiveView()}
                             </div>
                         </div>
                     </div>
