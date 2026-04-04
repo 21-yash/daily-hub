@@ -1,0 +1,256 @@
+/* ===== Music Player Styles ===== */
+
+/* Album art spin animation */
+@keyframes albumSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.album-spinning {
+  animation: albumSpin 8s linear infinite;
+}
+
+.album-paused {
+  animation-play-state: paused;
+}
+
+/* Vinyl groove rings */
+.vinyl-grooves {
+  background: repeating-radial-gradient(
+    circle at center,
+    transparent 0px,
+    transparent 3px,
+    rgba(255,255,255,0.03) 3px,
+    rgba(255,255,255,0.03) 4px
+  );
+}
+
+/* Audio visualizer bars */
+@keyframes visualizerBounce1 {
+  0%, 100% { height: 8px; }
+  50% { height: 28px; }
+}
+@keyframes visualizerBounce2 {
+  0%, 100% { height: 16px; }
+  50% { height: 36px; }
+}
+@keyframes visualizerBounce3 {
+  0%, 100% { height: 12px; }
+  50% { height: 32px; }
+}
+@keyframes visualizerBounce4 {
+  0%, 100% { height: 20px; }
+  50% { height: 24px; }
+}
+@keyframes visualizerBounce5 {
+  0%, 100% { height: 6px; }
+  50% { height: 40px; }
+}
+
+.visualizer-bar {
+  width: 3px;
+  border-radius: 2px;
+  transition: background-color 0.3s;
+}
+
+.visualizer-bar:nth-child(1) { animation: visualizerBounce1 0.8s ease-in-out infinite; }
+.visualizer-bar:nth-child(2) { animation: visualizerBounce2 0.6s ease-in-out infinite 0.1s; }
+.visualizer-bar:nth-child(3) { animation: visualizerBounce3 0.7s ease-in-out infinite 0.2s; }
+.visualizer-bar:nth-child(4) { animation: visualizerBounce4 0.9s ease-in-out infinite 0.15s; }
+.visualizer-bar:nth-child(5) { animation: visualizerBounce5 0.5s ease-in-out infinite 0.05s; }
+.visualizer-bar:nth-child(6) { animation: visualizerBounce1 0.75s ease-in-out infinite 0.25s; }
+.visualizer-bar:nth-child(7) { animation: visualizerBounce3 0.65s ease-in-out infinite 0.3s; }
+.visualizer-bar:nth-child(8) { animation: visualizerBounce2 0.85s ease-in-out infinite 0.12s; }
+
+.visualizer-paused .visualizer-bar {
+  animation-play-state: paused;
+  height: 4px !important;
+}
+
+/* Glow pulse for now-playing indicator */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(139, 92, 246, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.8); }
+}
+
+.glow-pulse {
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+/* Progress bar smooth transition */
+.progress-bar-fill {
+  transition: width 0.3s linear;
+}
+
+/* Smooth seek bar */
+.seek-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  background: transparent;
+}
+
+.seek-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #8b5cf6;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(139, 92, 246, 0.5);
+  transition: transform 0.15s ease;
+}
+
+.seek-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.3);
+}
+
+.seek-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #8b5cf6;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 6px rgba(139, 92, 246, 0.5);
+}
+
+/* Volume slider */
+.volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 80px;
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #8b5cf6;
+  cursor: pointer;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #8b5cf6;
+  cursor: pointer;
+  border: none;
+}
+
+/* Jam room floating avatars */
+@keyframes floatAvatar {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+.jam-avatar {
+  animation: floatAvatar 3s ease-in-out infinite;
+}
+
+.jam-avatar:nth-child(2) { animation-delay: 0.3s; }
+.jam-avatar:nth-child(3) { animation-delay: 0.6s; }
+.jam-avatar:nth-child(4) { animation-delay: 0.9s; }
+.jam-avatar:nth-child(5) { animation-delay: 1.2s; }
+
+/* Ripple effect on play button */
+@keyframes ripple {
+  0% { transform: scale(1); opacity: 0.4; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+.play-btn-ripple::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(139, 92, 246, 0.3);
+  animation: ripple 1.5s ease-out infinite;
+}
+
+/* Song card hover effect */
+.song-card {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.song-card:hover {
+  transform: translateX(4px);
+}
+
+.song-card.active-song {
+  border-left: 3px solid #8b5cf6;
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #8b5cf6, #ec4899, #f59e0b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Scrollbar for song list */
+.song-list-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.song-list-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.song-list-scroll::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.3);
+  border-radius: 2px;
+}
+
+.song-list-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.5);
+}
+
+/* Jam session pulse ring */
+@keyframes jamPulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.jam-active {
+  animation: jamPulse 2s ease-in-out infinite;
+}
+
+/* Typing indicator for chat */
+@keyframes typingDot {
+  0%, 100% { opacity: 0.3; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-3px); }
+}
+
+.typing-dot:nth-child(1) { animation: typingDot 1s infinite 0s; }
+.typing-dot:nth-child(2) { animation: typingDot 1s infinite 0.15s; }
+.typing-dot:nth-child(3) { animation: typingDot 1s infinite 0.3s; }
+
+/* Marquee for long song names */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.marquee-text {
+  animation: marquee 12s linear infinite;
+}
+
+/* Genre pill glow */
+.genre-pill-active {
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
+}

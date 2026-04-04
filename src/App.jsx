@@ -30,6 +30,7 @@ import CricketScoreboard from './components/cricket/CricketScoreboard';
 import PdfTools from './components/tools/PdfTools';
 import FindReplace from './components/tools/FindReplace';
 import AgeCalculator from './components/tools/AgeCalculator';
+import MusicPlayer from './components/music/MusicPlayer';
 import cricketIcon from './assets/icons/cricketIcon.svg?react';
 import { 
   todoService, 
@@ -1875,6 +1876,7 @@ const DailyHub = () => {
             { id: 'birthdays', label: 'Birthdays', icon: Cake },
             { id: 'news', label: 'News', icon: Newspaper },
             { id: 'watchlist', label: 'Watchlist', icon: Clapperboard },
+            { id: 'music', label: 'Music', icon: Music },
             { id: 'cricket', label: 'Cricket', icon: cricketIcon },
             { id: 'games', label: 'Games', icon: Gamepad2 },
             { id: 'links', label: 'Quick Links', icon: Link2 },
@@ -2072,6 +2074,7 @@ const DailyHub = () => {
                   { id: 'habits', label: 'Habits', icon: Goal },
                   { id: 'expenses', label: 'Expenses', icon: HandCoins },
                   { id: 'watchlist', label: 'Watchlist', icon: Clapperboard },
+                  { id: 'music', label: 'Music', icon: Music },
                   { id: 'cricket', label: 'Cricket', icon: cricketIcon },
                   { id: 'games', label: 'Games', icon: Gamepad2 },
                   { id: 'links', label: 'Quick Links', icon: Link2 },
@@ -3194,6 +3197,14 @@ const DailyHub = () => {
           />
         )}
 
+        {/* Music View */}
+        {activeView === 'music' && (
+          <MusicPlayer 
+            theme={theme}
+            showToast={showToast}
+          />
+        )}
+
         {/* Cricket View */}
         {activeView === 'cricket' && (
           <CricketScoreboard 
@@ -3488,6 +3499,7 @@ const DailyHub = () => {
                 { id: 'expenses', label: 'Expenses', icon: HandCoins },
                 { id: 'watchlist', label: 'Watchlist', icon: Clapperboard },
                 { id: 'birthdays', label: 'Birthdays', icon: Cake },
+                { id: 'music', label: 'Music', icon: Music },
                 { id: 'games', label: 'Games', icon: Gamepad2 },
                 { id: 'links', label: 'Links', icon: Link2 },
                 { id: 'timers', label: 'Timers', icon: Clock },
